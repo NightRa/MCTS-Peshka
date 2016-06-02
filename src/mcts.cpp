@@ -5,13 +5,14 @@
 #include "uci.h"
 #include "evaluate.h"
 #include "mcts_tablebase.h"
-#include "mcts_prior.h"
-
 
 namespace Search {
     const double cpuct = 1;
+    const float evalWeight = 0.2;
 
-    double mctsSearch(Position& pos, MCTS_Node& root) {
+    double eval(Position& pos);
+
+    void mctsSearch(Position& pos, MCTS_Node& root) {
         // Updated by check_time()
         initTableBase();
 
@@ -28,8 +29,6 @@ namespace Search {
 
             PlayingResult rolloutResult;
             double evalResult;
-
-            bool isCheck = false; //fill with something!
 
             PlayingResult gameResult = getGameResult(pos, node->getNumMoves(pos, moveBuffer));
 
@@ -63,12 +62,12 @@ namespace Search {
                     rolloutResult = rollout(pos, currentSt, lastSt);
                 }
 
-                evalResult = eval(pos, pos.side_to_move());
+                evalResult = eval(pos);
             }
 
             // Back propagation
             while (node->incoming_edge != nullptr) {
-                node->incoming_edge->update_stats(rolloutResult, evalResult);
+                node->incoming_edge->update_stats(rolloutResult, evalResult, evalWeight);
 
                 MCTS_Edge* childEdge = node->incoming_edge;
 
@@ -143,4 +142,18 @@ namespace Search {
 
         return bestEdge;
     }
+
+    double eval(Position& pos) {
+        // k = ln(p/(1-p))/delta x => delta x = 30, p = 0.9 => k = 0.073
+        Value v = Eval::evaluate(pos);
+        if (abs(v) < VALUE_MATE - MAX_PLY) { // not in mate, scale to -0.9 0.9
+            const double k = 0.073;
+            double pawnValue = double(v) / PawnValueEg; // assume range of [-30,30]
+            return (2 / (1 + std::exp(-k * pawnValue))) - 1; // Scaled sigmoid.
+        } else { // mate
+            return v > 0 ? 1 : -1;
+        }
+    }
+
+
 }

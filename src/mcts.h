@@ -33,12 +33,12 @@ struct MCTS_Edge {
 
     // Don't forget to initialize overallEval with the Prior
 
-    void update_stats(int rolloutResult, double evalResult) {
+    void update_stats(int rolloutResult, double evalResult, float evalWeight) {
         rolloutsSum += rolloutResult;
         numRollouts += 1;
         evalSum += evalResult;
         numEvals += 1;
-        overallEval = compute_overall_eval();
+        overallEval = compute_overall_eval(evalWeight);
     }
 
     MCTS_Edge(Move move, float prior, MCTS_Node* parent) : node(this), move(move), prior(prior), parent(parent) {
@@ -46,8 +46,9 @@ struct MCTS_Edge {
     }
 
 private:
-    float compute_overall_eval() {
-        return (0.5f * (float(rolloutsSum) / float(numRollouts)) + 0.5f * (float(evalSum) / float(numEvals)));
+    float compute_overall_eval(float evalWeight) {
+        return ((1 - evalWeight) * (float(rolloutsSum) / float(numRollouts)) +
+                (evalWeight) * (float(evalSum) / float(numEvals)));
     }
 };
 
