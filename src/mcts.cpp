@@ -23,6 +23,8 @@ namespace Search {
 
     void undo_move_mcts(Position &pos, MCTS_Node *&node, StateInfo *&currentSt);
 
+    void fillVectorWithMoves(Position &pos,std::vector<ExtMove> moves);
+
     double mctsSearch(Position &pos, MCTS_Node &root) {
         // Updated by check_time()
         initTableBase();
@@ -181,5 +183,15 @@ namespace Search {
         }
 
         return bestEdge;
+    }
+
+    // MoveBuffer is a 128 cells of ExtMoves that should be empty.
+    void fillVectorWithMoves(Position &pos, std::vector<ExtMove>& moveVector, ExtMove* moveBuffer){
+        ExtMove* startingPointer = moveBuffer;
+        ExtMove* endingPointer = generate<LEGAL>(pos, moveBuffer);
+        while (startingPointer != endingPointer){
+            moveVector.push_back(*startingPointer);
+            startingPointer++;
+        }
     }
 }
