@@ -86,10 +86,10 @@ class Position {
 public:
   static void init();
 
-  Position() = default; // To define the global object RootPos
+  Position() { setRandom(); }; // To define the global object RootPos
   Position(const Position&) = delete;
-  Position(const Position& pos, Thread* th) { *this = pos; thisThread = th; }
-  Position(const std::string& f, bool c960, Thread* th) { set(f, c960, th); }
+  Position(const Position& pos, Thread* th) { *this = pos; thisThread = th; setRandom(); }
+  Position(const std::string& f, bool c960, Thread* th) { set(f, c960, th); setRandom(); }
   Position& operator=(const Position&); // To assign RootPos from UCI
 
   // FEN string input/output
@@ -189,7 +189,10 @@ private:
   void move_piece(Color c, PieceType pt, Square from, Square to);
   template<bool Do>
   void do_castling(Color us, Square from, Square& to, Square& rfrom, Square& rto);
-
+  inline void setRandom(){
+    long long int seed = std::chrono::system_clock::now().time_since_epoch().count();
+    this->generator = std::mersenne_twister_engine(seed);
+  }
   // Data members
   Piece board[SQUARE_NB];
   Bitboard byTypeBB[PIECE_TYPE_NB];
@@ -207,9 +210,11 @@ private:
   Thread* thisThread;
   StateInfo* st;
   bool chess960;
+  std::mersenne_twister_engine generator;
 };
 
 extern std::ostream& operator<<(std::ostream& os, const Position& pos);
+
 
 inline Color Position::side_to_move() const {
   return sideToMove;
