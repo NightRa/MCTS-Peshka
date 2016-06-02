@@ -6,7 +6,7 @@
 #include "position.h"
 #include "movepick.h"
 
-void fillVectorWithMoves(Position &pos, std::vector<ExtMove>& moveVector, ExtMove* moveBuffer);
+void fillVectorWithMoves(Position& pos, std::vector<ExtMove>& moveVector, ExtMove* moveBuffer);
 
 typedef int NumVisits;
 typedef double EvalType;    // first check whether things work and only then change it to float
@@ -22,7 +22,7 @@ struct MCTS_Edge {
     NumVisits rolloutsSum;
     NumVisits numRollouts;
     float overallEval;
-    MCTS_Node *parent;
+    MCTS_Node* parent;
 
     // Don't forget to initialize overallEval with the Prior
 
@@ -49,11 +49,11 @@ public:
     std::vector<ExtMove> unopened_moves;
     NumVisits maxVisits;
     NumVisits totalVisits;
-    MCTS_Edge *incoming_edge;
+    MCTS_Edge* incoming_edge;
 public:
     MCTS_Node() : MCTS_Node(nullptr) {}
 
-    MCTS_Node(MCTS_Edge *parent) : edges(0 /*Init with size 0*/), unopened_moves(0), maxVisits(0), totalVisits(0),
+    MCTS_Node(MCTS_Edge* parent) : edges(0 /*Init with size 0*/), unopened_moves(0), maxVisits(0), totalVisits(0),
                                    incoming_edge(parent) {}
 
     ~MCTS_Node() {
@@ -66,12 +66,12 @@ public:
         return !edges.empty() && unopened_moves.empty();
     }
 
-    void update_child_stats(MCTS_Edge *childEdge) {
+    void update_child_stats(MCTS_Edge* childEdge) {
         totalVisits++;
         maxVisits = std::max(maxVisits, childEdge->numRollouts);
     }
 
-    MCTS_Edge *open_child(Position &pos, ExtMove* moveBuffer) {
+    MCTS_Edge* open_child(Position& pos, ExtMove* moveBuffer) {
         // Precondition: not terminal => possible moves not empty
         if (edges.empty() && unopened_moves.empty()) {
             fillVectorWithMoves(pos, unopened_moves, moveBuffer);

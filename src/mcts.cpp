@@ -9,38 +9,38 @@ namespace TB = Tablebases;
 namespace Search {
     const double cpuct = 1;
 
-    bool is_terminal(Position &position);
+    bool is_terminal(Position& position);
 
-    PlayingResult getGameResult(Position &pos, MCTS_Node *node, bool isCheck);
+    PlayingResult getGameResult(Position& pos, MCTS_Node* node, bool isCheck);
 
-    MCTS_Edge *select_child_UCT(MCTS_Node *node);
+    MCTS_Edge* select_child_UCT(MCTS_Node* node);
 
     void initTableBase();
 
-    bool isTerminal(Position &position, PlayingResult *playingResult);
+    bool isTerminal(Position& position, PlayingResult* playingResult);
 
-    void do_move_mcts(Position &pos, MCTS_Node *&node, StateInfo *&currentSt, MCTS_Edge *childEdge);
+    void do_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Edge* childEdge);
 
-    void undo_move_mcts(Position &pos, MCTS_Node *&node, StateInfo *&currentSt);
+    void undo_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt);
 
-    void fillVectorWithMoves(Position &pos,std::vector<ExtMove> moves);
+    void fillVectorWithMoves(Position& pos, std::vector<ExtMove> moves);
 
-    PlayingResult rollout(Position &position, StateInfo *&currentStateInfo, StateInfo *endingStateInfo);
+    PlayingResult rollout(Position& position, StateInfo*& currentStateInfo, StateInfo* endingStateInfo);
 
-    double mctsSearch(Position &pos, MCTS_Node &root) {
+    double mctsSearch(Position& pos, MCTS_Node& root) {
         // Updated by check_time()
         initTableBase();
 
         StateInfo sts[MAX_PLY];
-        StateInfo *lastSt = sts + MAX_PLY;
+        StateInfo* lastSt = sts + MAX_PLY;
 
 
         int iteration = 0;
         while (!Signals.stop) {
             iteration++;
 
-            MCTS_Node *node = &root;
-            StateInfo *currentSt = sts;
+            MCTS_Node* node = &root;
+            StateInfo* currentSt = sts;
 
             PlayingResult rolloutResult;
             double evalResult;
@@ -49,7 +49,7 @@ namespace Search {
             PlayingResult gameResult = getGameResult(pos, node, isCheck);
 
             while (gameResult == ContinueGame && !node->fully_opened()) {
-                MCTS_Edge *child = select_child_UCT(node);
+                MCTS_Edge* child = select_child_UCT(node);
                 do_move_mcts(pos, node, currentSt, child);
 
                 // If we reach the maximum depth, assume repeat or whatever.
@@ -66,7 +66,7 @@ namespace Search {
                 evalResult = rolloutResult;
 
             } else { // at leaf = not fully opened.
-                MCTS_Edge *childEdge = node->open_child(pos);
+                MCTS_Edge* childEdge = node->open_child(pos);
 
                 do_move_mcts(pos, node, currentSt, childEdge);
 
@@ -83,7 +83,7 @@ namespace Search {
             while (node->incoming_edge != nullptr) {
                 node->incoming_edge->update_stats(rolloutResult, evalResult);
 
-                MCTS_Edge *childEdge = node->incoming_edge;
+                MCTS_Edge* childEdge = node->incoming_edge;
 
                 undo_move_mcts(pos, node, currentSt);
 
@@ -96,20 +96,20 @@ namespace Search {
         }
     }
 
-    PlayingResult rollout(Position &position, StateInfo *&currentStateInfo, StateInfo *lastStateInfo) {
+    PlayingResult rollout(Position& position, StateInfo*& currentStateInfo, StateInfo* lastStateInfo) {
         PlayingResult result;
         ExtMove moveBuffer[128];
         Move movesDone[MAX_PLY];
         int filled = 0;
-        while (!isTerminal(position, &result)){
+        while (!isTerminal(position, &result)) {
             ExtMove* startingMove = moveBuffer;
             ExtMove* endingMove = generate<LEGAL>(position, startingMove);
             Move chosenMove = sampleMove(startingMove, endingMove - startingMove);
-            position.do_move(chosenMove, *currentStateInfo, (bool)position.checkers());
+            position.do_move(chosenMove, *currentStateInfo, (bool) position.checkers());
             movesDone[filled] = chosenMove;
             filled++;
             currentStateInfo++;
-            if (currentStateInfo == lastStateInfo){
+            if (currentStateInfo == lastStateInfo) {
                 result = Tie;
                 break;
             }
@@ -122,13 +122,13 @@ namespace Search {
         return result;
     }
 
-    void do_move_mcts(Position &pos, MCTS_Node *&node, StateInfo *&currentSt, MCTS_Edge *childEdge) {
+    void do_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Edge* childEdge) {
         node = &childEdge->node;
         pos.do_move(childEdge->move, *currentSt, pos.gives_check(childEdge->move, CheckInfo(pos)));
         currentSt++;
     }
 
-    void undo_move_mcts(Position &pos, MCTS_Node *&node, StateInfo *&currentSt) {
+    void undo_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt) {
         pos.undo_move(node->incoming_edge->move);
         node = node->incoming_edge->parent;
         currentSt--;
@@ -138,7 +138,7 @@ namespace Search {
         return pos.pieces() & ~pos.pieces(PAWN) & ~pos.pieces(KING);
     }
 
-    PlayingResult getGameResult(Position &pos, MCTS_Node *node, bool isCheck) {
+    PlayingResult getGameResult(Position& pos, MCTS_Node* node, bool isCheck) {
         PlayingResult res;
         if (isTerminal(pos, &res))
             return res;
@@ -165,7 +165,7 @@ namespace Search {
         return ContinueGame;
     }
 
-    bool isTerminal(Position &pos, PlayingResult *playingResult) {
+    bool isTerminal(Position& pos, PlayingResult* playingResult) {
         if (pos.count<ALL_PIECES>(WHITE) + pos.count<ALL_PIECES>(BLACK) > TB::Cardinality)
             return false;
         int found, v = Tablebases::probe_wdl(pos, &found);
@@ -176,8 +176,8 @@ namespace Search {
             int drawScore = TB::UseRule50 ? 1 : 0;
 
             *playingResult = v < -drawScore ? Lose
-                           : v >  drawScore ? Win
-                                            : Tie;
+                                            : v > drawScore ? Win
+                                                            : Tie;
             return true;
         }
     }
@@ -196,11 +196,11 @@ namespace Search {
         }
     }
 
-    MCTS_Edge *select_child_UCT(MCTS_Node *node) {
+    MCTS_Edge* select_child_UCT(MCTS_Node* node) {
         // attest( ! children.empty() );
         double max_UCT_score = -VALUE_INFINITE;
-        MCTS_Edge *bestEdge = nullptr;
-        for (MCTS_Edge &child: node->edges) {
+        MCTS_Edge* bestEdge = nullptr;
+        for (MCTS_Edge& child: node->edges) {
             double score = child.overallEval +
                            cpuct * child.prior * std::sqrt(node->totalVisits) / (1 + child.numRollouts);
             if (score > max_UCT_score) {
@@ -213,10 +213,10 @@ namespace Search {
     }
 
     // MoveBuffer is a 128 cells of ExtMoves that should be empty.
-    void fillVectorWithMoves(Position &pos, std::vector<ExtMove>& moveVector, ExtMove* moveBuffer){
+    void fillVectorWithMoves(Position& pos, std::vector<ExtMove>& moveVector, ExtMove* moveBuffer) {
         ExtMove* startingPointer = moveBuffer;
         ExtMove* endingPointer = generate<LEGAL>(pos, moveBuffer);
-        while (startingPointer != endingPointer){
+        while (startingPointer != endingPointer) {
             moveVector.push_back(*startingPointer);
             startingPointer++;
         }
@@ -224,7 +224,7 @@ namespace Search {
 
     Move sampleMove(ExtMove* moves, int size) {
         long long int seed = std::chrono::system_clock::now().time_since_epoch().count();
-        std::mersenne_twister_engine generator (seed);
+        std::mersenne_twister_engine generator(seed);
 
         const int smoothing = 50;
 
