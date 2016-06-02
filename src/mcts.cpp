@@ -50,7 +50,9 @@ namespace Search {
 
                 rolloutResult = gameResult;
                 evalResult = rolloutResult;
+
             } else { // at leaf = not fully opened.
+
                 MCTS_Edge* childEdge = node->open_child(pos, moveBuffer);
 
                 do_move_mcts(pos, node, currentSt, childEdge);
@@ -88,9 +90,11 @@ namespace Search {
         int filled = 0;
         while (result == ContinueGame) {
             ExtMove* startingMove = moveBuffer;
+
             ExtMove* endingMove = generate<LEGAL>(position, startingMove);
             int movesSize = int(endingMove - startingMove);
             calc_priors(position, startingMove, movesSize);
+
             Move chosenMove = sampleMove(position, startingMove, movesSize);
             position.do_move(chosenMove, *currentStateInfo, position.gives_check(chosenMove, CheckInfo(position)));
             movesDone[filled] = chosenMove;
