@@ -1,7 +1,9 @@
 #include <cmath>
 #include <c++/5.2.0/algorithm>
+#include <syzygy/tbprobe.h>
 #include "mcts.h"
-#include "search.h"
+#include "uci.h"
+namespace TB = Tablebases;
 
 namespace Search {
     const double cpuct = 1;
@@ -12,9 +14,12 @@ namespace Search {
 
     MCTS_Edge *select_child_UCT(MCTS_Node *node);
 
+    void initTableBase();
+    bool canGetResult(Position &position, PlayingResult *playingResult);
+
     double mctsSearch(Position &pos, MCTS_Node &root) {
         // Updated by check_time()
-
+        initTableBase();
         int iteration = 0;
         while (!Signals.stop) {
             iteration++;
@@ -62,7 +67,12 @@ namespace Search {
         }
     }
 
+
     PlayingResult getGameResult(Position &pos, MCTS_Node *node, bool isCheck) {
+        PlayingResult res;
+        if (canGetResult(pos, &res))
+            return res;
+
         if ((pos.pieces() & ~pos.pieces(PAWN) & ~pos.pieces(KING)) != 0)
             return Win;
         if (node->edges.size() + node->unopened_moves.size() == 0) {
@@ -75,6 +85,38 @@ namespace Search {
         if (pos.is_draw())
             return Tie;
         return ContinueGame;
+    }
+
+    bool canGetResult(Position &pos, PlayingResult *playingResult) {
+        if (pos.count<ALL_PIECES>(WHITE) + pos.count<ALL_PIECES>(BLACK) > TB::Cardinality)
+            return false;
+        int found, v = Tablebases::probe_wdl(pos, &found);
+
+        if (!found)
+            return false;
+        else {
+            int drawScore = TB::UseRule50 ? 1 : 0;
+
+            *playingResult = v < -drawScore ? Lose
+                           : v > drawScore  ? Win
+                           :                  Tie;
+            return true;
+        }
+    }
+
+    void initTableBase() {
+        TB::Hits = 0;
+        TB::RootInTB = false;
+        TB::UseRule50 = Options["Syzygy50MoveRule"];
+        TB::ProbeDepth = Options["SyzygyProbeDepth"] * ONE_PLY;
+        TB::Cardinality = Options["SyzygyProbeLimit"];
+
+        // Skip TB probing when no TB found: !TBLargest -> !TB::Cardinality
+        if (TB::Cardinality > TB::MaxCardinality)
+        {
+            TB::Cardinality = TB::MaxCardinality;
+            TB::ProbeDepth = DEPTH_ZERO;
+        }
     }
 
     MCTS_Edge *select_child_UCT(MCTS_Node *node) {
@@ -91,10 +133,5 @@ namespace Search {
         }
 
         return bestEdge;
-    }
-
-    bool is_terminal(Position &pos) {
-        return (pos.pieces() & ~pos.pieces(PAWN) & ~pos.pieces(KING)) != 0;
-
     }
 }

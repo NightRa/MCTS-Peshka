@@ -13,6 +13,12 @@ int probe_dtz(Position& pos, int *success);
 bool root_probe(Position& pos, Search::RootMoveVector& rootMoves, Value& score);
 bool root_probe_wdl(Position& pos, Search::RootMoveVector& rootMoves, Value& score);
 
+int Cardinality;
+uint64_t Hits;
+bool RootInTB;
+bool UseRule50;
+Depth ProbeDepth;
+Value Score;
 }
 
 #endif

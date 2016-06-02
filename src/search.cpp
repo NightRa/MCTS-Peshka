@@ -43,7 +43,7 @@ namespace Search {
   StateStackPtr SetupStates;
 }
 
-namespace Tablebases {
+/*namespace Tablebases {
 
   int Cardinality;
   uint64_t Hits;
@@ -51,7 +51,7 @@ namespace Tablebases {
   bool UseRule50;
   Depth ProbeDepth;
   Value Score;
-}
+}*/
 
 namespace TB = Tablebases;
 
@@ -266,9 +266,9 @@ void MainThread::search() {
               TB::Cardinality = 0; // Do not probe tablebases during the search
 
           else // If DTZ tables are missing, use WDL tables as a fallback
-          {
-              // Filter out moves that do not preserve a draw or win
-              TB::RootInTB = Tablebases::root_probe_wdl(rootPos, rootMoves, TB::Score);
+              {
+                  // Filter out moves that do not preserve a draw or win
+                  TB::RootInTB = Tablebases::root_probe_wdl(rootPos, rootMoves, TB::Score);
 
               // Only probe during search if winning
               if (TB::Score <= VALUE_DRAW)
@@ -684,6 +684,7 @@ namespace {
             &&  pos.rule50_count() == 0)
         {
             int found, v = Tablebases::probe_wdl(pos, &found);
+
 
             if (found)
             {
