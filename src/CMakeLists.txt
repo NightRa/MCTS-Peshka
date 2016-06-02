@@ -52,7 +52,7 @@ set(SOURCE_FILES
     mcts_tablebase.cpp
     mcts_tablebase.h
     mcts_prior.cpp
-    mcts_prior.h)
+    mcts_prior.h mcts_pv.cpp mcts_pv.h)
 
 include_directories(.)
 include_directories(syzygy)

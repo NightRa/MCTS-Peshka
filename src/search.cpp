@@ -885,12 +885,12 @@ moves_loop: // When in check search starts from here
       ss->moveCount = ++moveCount;
 
       if (RootNode && thisThread == Threads.main() && Time.elapsed() > 3000)
-          sync_cout << "info depth " << depth / ONE_PLY
-                    << " currmove " << UCI::move(move, pos.is_chess960())
-                    << " currmovenumber " << moveCount + thisThread->PVIdx << sync_endl;
+            sync_cout << "info depth " << depth / ONE_PLY
+            << " currmove " << UCI::move(move, pos.is_chess960())
+            << " currmovenumber " << moveCount + thisThread->PVIdx << sync_endl;
 
-      if (PvNode)
-          (ss+1)->pv = nullptr;
+        if (PvNode)
+            (ss+1)->pv = nullptr;
 
       extension = DEPTH_ZERO;
       captureOrPromotion = pos.capture_or_promotion(move);
@@ -1541,10 +1541,10 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
           ss << "\n";
 
       ss << "info"
-         << " depth "    << d / ONE_PLY
-         << " seldepth " << pos.this_thread()->maxPly
-         << " multipv "  << i + 1
-         << " score "    << UCI::value(v);
+         << " odepth \"    << d / ONE_PLY\n"
+                                                                                                                    "         << \" seldepth \" << pos.this_thread()->maxPly\n"
+                                                                                                                    "         << \" multipv \"  << i + 1\n"
+                                                                                                                    "         << \" scre "    << UCI::value(v);
 
       if (!tb && i == PVIdx)
           ss << (v >= beta ? " lowerbound" : v <= alpha ? " upperbound" : "");

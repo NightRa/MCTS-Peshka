@@ -33,6 +33,10 @@ struct MCTS_Edge {
 
     // Don't forget to initialize overallEval with the Prior
 
+    int score (){
+        //TODO: Implement
+    }
+
     void update_stats(int rolloutResult, double evalResult, float evalWeight) {
         rolloutsSum += rolloutResult;
         numRollouts += 1;
