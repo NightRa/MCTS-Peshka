@@ -4,20 +4,16 @@
 #include "mcts.h"
 #include "uci.h"
 #include "evaluate.h"
+#include "mcts_chess_playing.h"
+#include "mcts_tablebase.h"
 
-namespace TB = Tablebases;
 
 namespace Search {
     const double cpuct = 1;
 
-    bool is_terminal(Position& position);
-    PlayingResult getGameResult(Position& pos, MCTS_Node* node, bool isCheck);
     MCTS_Edge* select_child_UCT(MCTS_Node* node);
-    void initTableBase();
-    bool isInTableBase(Position& position, PlayingResult* playingResult);
     void do_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Edge* childEdge);
     void undo_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt);
-    void fillVectorWithMoves(Position& pos, std::vector<ExtMove> moves);
     PlayingResult rollout(Position& position, StateInfo*& currentStateInfo, StateInfo* endingStateInfo);
     Move sampleMove(ExtMove* moves, int size);
 
@@ -27,7 +23,6 @@ namespace Search {
 
         StateInfo sts[MAX_PLY];
         StateInfo* lastSt = sts + MAX_PLY;
-
 
         int iteration = 0;
         while (!Signals.stop) {
@@ -40,7 +35,7 @@ namespace Search {
             double evalResult;
 
             bool isCheck = false; //fill with something!
-            PlayingResult gameResult = getGameResult(pos, node, isCheck);
+            PlayingResult gameResult = getGameResult(pos, node->unopened_moves.size() + node->unopened_moves.size());
 
             while (gameResult == ContinueGame && !node->fully_opened()) {
                 MCTS_Edge* child = select_child_UCT(node);
@@ -49,16 +44,16 @@ namespace Search {
                 // If we reach the maximum depth, assume repeat or whatever.
                 if (currentSt == lastSt) {
                     gameResult = Tie;
-                } else {
-                    gameResult = getGameResult(pos, node, isCheck);
-                }
+
+            } else {
+                gameResult = getGameResult(pos, node->unopened_moves.size() + node->unopened_moves.size());
             }
+        }
 
-            if (gameResult != ContinueGame) {
+        if (gameResult != ContinueGame) {
 
-                rolloutResult = gameResult;
-                evalResult = rolloutResult;
-
+            rolloutResult = gameResult;
+            evalResult = rolloutResult;
             } else { // at leaf = not fully opened.
                 MCTS_Edge* childEdge = node->open_child(pos);
 
@@ -131,69 +126,6 @@ namespace Search {
         currentSt--;
     }
 
-    Bitboard promotedPieces(Position& pos) {
-        return pos.pieces() & ~pos.pieces(PAWN) & ~pos.pieces(KING);
-    }
-
-    PlayingResult getGameResult(Position& pos, int numMoves) {
-        PlayingResult res;
-        if (isInTableBase(pos, &res))
-            return res;
-
-        Bitboard promoted = promotedPieces(pos);
-        Color sideToMove = pos.side_to_move();
-        Bitboard ourPromoted = pos.pieces(sideToMove) & promoted;
-
-        if (ourPromoted)
-            return Win;
-        if (promoted /*&& !ourPromoted*/) {
-            return Lose;
-        }
-
-        if (numMoves == 0) {
-            if (pos.checkers())
-                return Lose;
-            else
-                return Tie;
-        }
-
-        if (pos.is_draw())
-            return Tie;
-        return ContinueGame;
-    }
-
-    bool isInTableBase(Position& pos, PlayingResult* playingResult) {
-        if (pos.count<ALL_PIECES>(WHITE) + pos.count<ALL_PIECES>(BLACK) > TB::Cardinality)
-            return false;
-        int found;                       //  =>
-        int v = Tablebases::probe_wdl(pos, &found);
-
-        if (!found)
-            return false;
-        else {
-            int drawScore = TB::UseRule50 ? 1 : 0;
-
-            *playingResult = v < -drawScore     ? Lose
-                                : v > drawScore ? Win
-                                :                 Tie;
-            return true;
-        }
-    }
-
-    void initTableBase() {
-        TB::Hits = 0;
-        TB::RootInTB = false;
-        TB::UseRule50 = Options["Syzygy50MoveRule"];
-        TB::ProbeDepth = Options["SyzygyProbeDepth"] * ONE_PLY;
-        TB::Cardinality = Options["SyzygyProbeLimit"];
-
-        // Skip TB probing when no TB found: !TBLargest -> !TB::Cardinality
-        if (TB::Cardinality > TB::MaxCardinality) {
-            TB::Cardinality = TB::MaxCardinality;
-            TB::ProbeDepth = DEPTH_ZERO;
-        }
-    }
-
     MCTS_Edge* select_child_UCT(MCTS_Node* node) {
         // attest( ! children.empty() );
         double max_UCT_score = -VALUE_INFINITE;
@@ -208,16 +140,6 @@ namespace Search {
         }
 
         return bestEdge;
-    }
-
-    // MoveBuffer is a 128 cells of ExtMoves that should be empty.
-    void fillVectorWithMoves(Position& pos, std::vector<ExtMove>& moveVector, ExtMove* moveBuffer) {
-        ExtMove* startingPointer = moveBuffer;
-        ExtMove* endingPointer = generate<LEGAL>(pos, moveBuffer);
-        while (startingPointer != endingPointer) {
-            moveVector.push_back(*startingPointer);
-            startingPointer++;
-        }
     }
 
     Move sampleMove(Position& pos, ExtMove* moves, int size) {
