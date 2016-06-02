@@ -51,6 +51,7 @@ public:
     // States: Uninitialized - Edges empty & unopened moves empty
     //         Not fully opened - Edges not empty & unopened moves not empty
     //         Fully opened - Edges not empty & unopened moves empty
+    bool initialized;
     std::vector<MCTS_Edge> edges;
     std::vector<ExtMove> unopened_moves;
     NumVisits maxVisits;
@@ -59,7 +60,7 @@ public:
 public:
     MCTS_Node() : MCTS_Node(nullptr) {}
 
-    MCTS_Node(MCTS_Edge* parent) : edges(0 /*Init with size 0*/), unopened_moves(0), maxVisits(0), totalVisits(0),
+    MCTS_Node(MCTS_Edge* parent) : initialized(false), edges(0 /*Init with size 0*/), unopened_moves(0), maxVisits(0), totalVisits(0),
                                    incoming_edge(parent) {}
 
     ~MCTS_Node() {
@@ -69,13 +70,29 @@ public:
     }
 
     inline bool fully_opened() {
-        return !edges.empty() && unopened_moves.empty();
+        return initialized && unopened_moves.empty();
+    }
+
+    bool inMate() {
+        return initialized && unopened_moves.empty() && edges.empty();
     }
 
     void update_child_stats(MCTS_Edge* childEdge) {
         totalVisits++;
         maxVisits = std::max(maxVisits, childEdge->numRollouts);
     }
+
+    int getNumMoves(Position& pos, ExtMove* buffer) {
+        if(!initialized) {
+            // Instead of wasting memory, we recompute instead.
+            ExtMove* end = generate<LEGAL>(pos, buffer);
+            return int(end - buffer);
+        } else {
+            return int(edges.size() + unopened_moves.size());
+        }
+    }
+
+    void initialize(Position& pos, ExtMove* buffer);
 
     MCTS_Edge* open_child(Position& pos, ExtMove* moveBuffer) {
         // Precondition: not terminal => possible moves not empty

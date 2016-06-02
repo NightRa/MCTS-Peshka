@@ -30,10 +30,8 @@ namespace Search {
             double evalResult;
 
             bool isCheck = false; //fill with something!
-            // FIXME: unopened.size + opened.size != #of moves, my be uninitialized!
-            // getGameResult requires numMoves - Requiring to generate the moves. Problem!
-            // to determine whether terminal, must know #of possible moves.
-            PlayingResult gameResult = getGameResult(pos, node->unopened_moves.size() + node->unopened_moves.size());
+
+            PlayingResult gameResult = getGameResult(pos, node->getNumMoves(pos, moveBuffer));
 
             while (gameResult == ContinueGame && !node->fully_opened()) {
                 MCTS_Edge* child = select_child_UCT(node);
@@ -44,7 +42,7 @@ namespace Search {
                     gameResult = Tie;
 
                 } else {
-                    gameResult = getGameResult(pos, node->unopened_moves.size() + node->unopened_moves.size());
+                    gameResult = getGameResult(pos, node->getNumMoves(pos, moveBuffer));
                 }
             }
 
