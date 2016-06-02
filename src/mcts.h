@@ -84,11 +84,5 @@ public:
     }
 };
 
-enum PlayingResult {
-    ContinueGame = 2,
-    Win = 1,
-    Lose = -1,
-    Tie = 0
-};
 // void fillVectorWithMoves(Position &pos, std::vector<ExtMove>& moveVector, ExtMove* moveBuffer);
 #endif //SRC_MCTS_H

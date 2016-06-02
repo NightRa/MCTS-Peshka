@@ -40,6 +40,18 @@ struct ExtMove {
 
   operator Move() const { return move; }
   void operator=(Move m) { move = m; }
+  float getPrior() {
+      union {float f; int i;} eval;
+      eval.i = value;
+      return eval.f;
+  }
+
+  void setPrior(float prior) {
+      union {float f; int i;} eval;
+      eval.f = prior;
+      value = Value(eval.i);
+  }
+
 };
 
 inline bool operator<(const ExtMove& f, const ExtMove& s) {
