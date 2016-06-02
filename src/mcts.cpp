@@ -27,7 +27,7 @@ namespace Search {
 
         StateInfo sts[MAX_PLY];
         StateInfo* lastSt = sts + MAX_PLY;
-
+        ExtMove moveBuffer[128];
 
         int iteration = 0;
         while (!Signals.stop) {
@@ -60,7 +60,7 @@ namespace Search {
                 evalResult = rolloutResult;
 
             } else { // at leaf = not fully opened.
-                MCTS_Edge* childEdge = node->open_child(pos);
+                MCTS_Edge* childEdge = node->open_child(pos, moveBuffer);
 
                 do_move_mcts(pos, node, currentSt, childEdge);
 
@@ -90,6 +90,8 @@ namespace Search {
         }
     }
 
+    void calc_priors(Position& pos, ExtMove* moves, int size);
+
     PlayingResult rollout(Position& position, StateInfo*& currentStateInfo, StateInfo* lastStateInfo) {
         PlayingResult result = getGameResult(position, position.count(WHITE) + position.count(BLACK));
         ExtMove moveBuffer[MAX_PLY];
@@ -98,7 +100,9 @@ namespace Search {
         while (result == ContinueGame) {
             ExtMove* startingMove = moveBuffer;
             ExtMove* endingMove = generate<LEGAL>(position, startingMove);
-            Move chosenMove = sampleMove(startingMove, int(endingMove - startingMove));
+            int movesSize = int(endingMove - startingMove);
+            calc_priors(position, startingMove, movesSize);
+            Move chosenMove = sampleMove(position, startingMove, movesSize);
             position.do_move(chosenMove, *currentStateInfo, position.gives_check(chosenMove, CheckInfo(position)));
             movesDone[filled] = chosenMove;
             filled++;
@@ -220,41 +224,50 @@ namespace Search {
         }
     }
 
-    Move sampleMove(Position& pos, ExtMove* moves, int size) {
-        long long int seed = std::chrono::system_clock::now().time_since_epoch().count();
-        std::mersenne_twister_engine generator(seed);
-
+    void calc_priors(Position& pos, ExtMove* moves, int size) {
+        const float normalizationFactor = 200; // Something like a pawn
         StateInfo st;
-        const int smoothing = 50;
-
         const CheckInfo ci(pos);
-
-        Value min = VALUE_INFINITE;
+        float max = -VALUE_INFINITE;
+        // u.f is always the real value, u.i is always the stored repr.
         for (int i = 0; i < size; i++) {
             // calculate move values (heuristics)
             pos.do_move(moves[i].move, st, pos.gives_check(moves[i], ci));
-            moves[i].value = Eval::evaluate<false>(pos);
+            float eval = float(Eval::evaluate<false>(pos)) / normalizationFactor;
+            moves[i].setPrior(eval);
             pos.undo_move(moves[i]);
 
-            min = std::min(min, moves[i].value);
+            max = std::max(max, eval);
         }
 
-        // x -> x - min + smoothing
-
-        int sum = 0;
+        double expSum = 0;
         for (int i = 0; i < size; i++) {
-            moves[i].value = moves[i].value - min + smoothing;
-            sum += moves[i].value;
+            float eval = std::exp(moves[i].getPrior() - max);
+            moves[i].setPrior(eval);
+
+            expSum += eval;
         }
 
-        std::uniform_int_distribution<int> distribution(0, sum - 1);
+        for (int i = 0; i < size; i++) {
+            double eval = double(moves[i].getPrior()) / expSum;
+            moves[i].setPrior(float(eval));
+        }
+    }
 
-        int stopPoint = distribution(generator);
+    Move sampleMove(Position& pos, ExtMove* moves, int size) {
 
-        int partialSum = 0;
+        long long int seed = std::chrono::system_clock::now().time_since_epoch().count();
+        std::mersenne_twister_engine generator(seed);
+
+        std::uniform_real_distribution<float> distribution(0.0, 1.0);
+
+        float stopPoint = distribution(generator);
+
+        float partialSum = 0;
         int i = 0;
         while (partialSum <= stopPoint) {
-            partialSum += moves[i].value;
+            u eval = moves[i].value;
+            partialSum += ;
             i++;
         }
 
