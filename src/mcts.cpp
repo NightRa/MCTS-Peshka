@@ -3,6 +3,7 @@
 #include <syzygy/tbprobe.h>
 #include "mcts.h"
 #include "uci.h"
+#include "evaluate.h"
 
 namespace TB = Tablebases;
 
@@ -10,22 +11,15 @@ namespace Search {
     const double cpuct = 1;
 
     bool is_terminal(Position& position);
-
     PlayingResult getGameResult(Position& pos, MCTS_Node* node, bool isCheck);
-
     MCTS_Edge* select_child_UCT(MCTS_Node* node);
-
     void initTableBase();
-
     bool isTerminal(Position& position, PlayingResult* playingResult);
-
     void do_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Edge* childEdge);
-
     void undo_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt);
-
     void fillVectorWithMoves(Position& pos, std::vector<ExtMove> moves);
-
     PlayingResult rollout(Position& position, StateInfo*& currentStateInfo, StateInfo* endingStateInfo);
+    Move sampleMove(ExtMove* moves, int size);
 
     double mctsSearch(Position& pos, MCTS_Node& root) {
         // Updated by check_time()
@@ -98,14 +92,14 @@ namespace Search {
 
     PlayingResult rollout(Position& position, StateInfo*& currentStateInfo, StateInfo* lastStateInfo) {
         PlayingResult result;
-        ExtMove moveBuffer[128];
+        ExtMove moveBuffer[MAX_PLY];
         Move movesDone[MAX_PLY];
         int filled = 0;
         while (!isTerminal(position, &result)) {
             ExtMove* startingMove = moveBuffer;
             ExtMove* endingMove = generate<LEGAL>(position, startingMove);
-            Move chosenMove = sampleMove(startingMove, endingMove - startingMove);
-            position.do_move(chosenMove, *currentStateInfo, (bool) position.checkers());
+            Move chosenMove = sampleMove(startingMove, int(endingMove - startingMove));
+            position.do_move(chosenMove, *currentStateInfo, position.gives_check(chosenMove, CheckInfo(position)));
             movesDone[filled] = chosenMove;
             filled++;
             currentStateInfo++;
@@ -114,11 +108,13 @@ namespace Search {
                 break;
             }
         }
+
         for (int i = filled - 1; i >= 0; i--) {
             currentStateInfo--;
             position.undo_move(movesDone[i]);
         }
 
+        // Computed in isTerminal, notice reference above.
         return result;
     }
 
@@ -222,14 +218,22 @@ namespace Search {
         }
     }
 
-    Move sampleMove(ExtMove* moves, int size) {
+    Move sampleMove(Position& pos, ExtMove* moves, int size) {
         long long int seed = std::chrono::system_clock::now().time_since_epoch().count();
         std::mersenne_twister_engine generator(seed);
 
+        StateInfo st;
         const int smoothing = 50;
+
+        const CheckInfo ci(pos);
 
         Value min = VALUE_INFINITE;
         for (int i = 0; i < size; i++) {
+            // calculate move values (heuristics)
+            pos.do_move(moves[i].move, st, pos.gives_check(moves[i], ci));
+            moves[i].value = Eval::evaluate<false>(pos);
+            pos.undo_move(moves[i]);
+
             min = std::min(min, moves[i].value);
         }
 
