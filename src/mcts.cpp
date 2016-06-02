@@ -31,10 +31,9 @@ namespace Search {
         // Updated by check_time()
         initTableBase();
 
-        int MAX_DEPTH = 256;
+        StateInfo sts[MAX_PLY];
+        StateInfo *lastSt = sts + MAX_PLY;
 
-        StateInfo sts[MAX_DEPTH];
-        StateInfo *lastSt = sts + MAX_DEPTH;
 
         int iteration = 0;
         while (!Signals.stop) {
@@ -221,5 +220,38 @@ namespace Search {
             moveVector.push_back(*startingPointer);
             startingPointer++;
         }
+    }
+
+    Move sampleMove(ExtMove* moves, int size) {
+        long long int seed = std::chrono::system_clock::now().time_since_epoch().count();
+        std::mersenne_twister_engine generator (seed);
+
+        const int smoothing = 50;
+
+        Value min = VALUE_INFINITE;
+        for (int i = 0; i < size; i++) {
+            min = std::min(min, moves[i].value);
+        }
+
+        // x -> x - min + smoothing
+
+        int sum = 0;
+        for (int i = 0; i < size; i++) {
+            moves[i].value = moves[i].value - min + smoothing;
+            sum += moves[i].value;
+        }
+
+        std::uniform_int_distribution<int> distribution(0, sum - 1);
+
+        int stopPoint = distribution(generator);
+
+        int partialSum = 0;
+        int i = 0;
+        while (partialSum <= stopPoint) {
+            partialSum += moves[i].value;
+            i++;
+        }
+
+        return moves[i - 1];
     }
 }

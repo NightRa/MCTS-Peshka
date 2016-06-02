@@ -6,16 +6,12 @@
 #include "position.h"
 #include "movepick.h"
 
+void fillVectorWithMoves(Position &pos, std::vector<ExtMove>& moveVector, ExtMove* moveBuffer);
+
 typedef int NumVisits;
 typedef double EvalType;    // first check whether things work and only then change it to float
 
 class MCTS_Node;
-
-struct UnopenedMove {
-    Move move;
-    float prior;
-
-};
 
 struct MCTS_Edge {
     MCTS_Node node;
@@ -50,7 +46,7 @@ public:
     //         Not fully opened - Edges not empty & unopened moves not empty
     //         Fully opened - Edges not empty & unopened moves empty
     std::vector<MCTS_Edge> edges;
-    std::vector<UnopenedMove> unopened_moves;
+    std::vector<ExtMove> unopened_moves;
     NumVisits maxVisits;
     NumVisits totalVisits;
     MCTS_Edge *incoming_edge;
@@ -75,33 +71,16 @@ public:
         maxVisits = std::max(maxVisits, childEdge->numRollouts);
     }
 
-    void generate_moves(Position &pos) {
-        MovePicker mp(pos, ttMove, thisThread->history, PieceValue[MG][pos.captured_piece_type()]);
-        CheckInfo ci(pos);
-        Move move;
-        while ((move = mp.next_move()) != MOVE_NONE) {
-            if (pos.legal(move, ci.pinned)) {
-                // ss->currentMove = move;
-                pos.do_move(move, st, pos.gives_check(move, ci));
-                // value = -search<NonPV>(pos, ss+1, -rbeta, -rbeta+1, rdepth, !cutNode);
-                pos.undo_move(move);
-                // if (value >= rbeta)
-                //    return value;
-            }
-        }
-
-    };
-
-    MCTS_Edge *open_child(Position &pos) {
+    MCTS_Edge *open_child(Position &pos, ExtMove* moveBuffer) {
         // Precondition: not terminal => possible moves not empty
         if (edges.empty() && unopened_moves.empty()) {
-            generate_moves(pos);
+            fillVectorWithMoves(pos, unopened_moves, moveBuffer);
+            calculate_values();
             // Generate moves, unopened_moves not empty.
         }
         // unopened_moves not empty.
         // sample move according to prior probabilities / take maximal probability
         // remove it from unopened_moves and insert to edges.
-
     }
 };
 
@@ -111,5 +90,5 @@ enum PlayingResult {
     Lose = -1,
     Tie = 0
 };
-
+// void fillVectorWithMoves(Position &pos, std::vector<ExtMove>& moveVector, ExtMove* moveBuffer);
 #endif //SRC_MCTS_H
