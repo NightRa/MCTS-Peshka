@@ -1,10 +1,16 @@
+#include <cmath>
+#include <c++/5.2.0/algorithm>
 #include "mcts.h"
 #include "search.h"
 
 namespace Search {
+    const double cpuct = 1;
+
     bool is_terminal(Position &position);
 
-    PlayingResult getGameResult(Position &pos, MCTS_Node* node, bool isCheck);
+    PlayingResult getGameResult(Position &pos, MCTS_Node *node, bool isCheck);
+
+    MCTS_Edge *select_child_UCT(MCTS_Node *node);
 
     double mctsSearch(Position &pos, MCTS_Node &root) {
         // Updated by check_time()
@@ -56,10 +62,10 @@ namespace Search {
         }
     }
 
-    PlayingResult getGameResult(Position &pos, MCTS_Node* node, bool isCheck) {
-        if ((pos.pieces() &~ pos.pieces(PAWN) &~ pos.pieces(KING)) != 0)
+    PlayingResult getGameResult(Position &pos, MCTS_Node *node, bool isCheck) {
+        if ((pos.pieces() & ~pos.pieces(PAWN) & ~pos.pieces(KING)) != 0)
             return Win;
-        if (node->edges.size() + node->unopened_moves.size() == 0){
+        if (node->edges.size() + node->unopened_moves.size() == 0) {
             if (isCheck)
                 return Lose;
             else
@@ -69,5 +75,26 @@ namespace Search {
         if (pos.is_draw())
             return Tie;
         return ContinueGame;
+    }
+
+    MCTS_Edge *select_child_UCT(MCTS_Node *node) {
+        // attest( ! children.empty() );
+        double max_UCT_score = -VALUE_INFINITE;
+        MCTS_Edge *bestEdge = nullptr;
+        for (MCTS_Edge &child: node->edges) {
+            double score = child.overallEval +
+                           cpuct * child.prior * std::sqrt(node->totalVisits) / (1 + child.numRollouts);
+            if (score > max_UCT_score) {
+                max_UCT_score = score;
+                bestEdge = &child;
+            }
+        }
+
+        return bestEdge;
+    }
+
+    bool is_terminal(Position &pos) {
+        return (pos.pieces() & ~pos.pieces(PAWN) & ~pos.pieces(KING)) != 0;
+
     }
 }
