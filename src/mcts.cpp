@@ -4,6 +4,8 @@
 namespace Search {
     bool is_terminal(Position &position);
 
+    PlayingResult getGameResult(Position &pos, MCTS_Node* node, bool isCheck);
+
     double mctsSearch(Position &pos, MCTS_Node &root) {
         // Updated by check_time()
 
@@ -15,16 +17,18 @@ namespace Search {
 
             int rolloutResult;
             double evalResult;
+            bool isCheck = false; //fill with something!
+            PlayingResult gameResult = getGameResult(pos, node, isCheck);
 
-            while (!is_terminal(pos) && !node->fully_opened()) {
+            while (gameResult == ContinueGame && !node->fully_opened()) {
                 MCTS_Edge *child = select_child_UCT(node);
                 node = &child->node;
                 pos.do_move(child->move, st, gives_check);
+                gameResult = getGameResult(pos, node, isCheck);
             }
+            if (gameResult != ContinueGame) {
 
-            if (is_terminal(pos)) {
-
-                rolloutResult = get_result(pos, pos.side_to_move());
+                rolloutResult = gameResult;
                 evalResult = rolloutResult;
 
             } else { // at leaf / not fully opened.
@@ -52,7 +56,18 @@ namespace Search {
         }
     }
 
-    bool is_terminal(Position &pos) {
-        return (pos.pieces() &~ pos.pieces(PAWN) &~ pos.pieces(KING)) != 0;
+    PlayingResult getGameResult(Position &pos, MCTS_Node* node, bool isCheck) {
+        if ((pos.pieces() &~ pos.pieces(PAWN) &~ pos.pieces(KING)) != 0)
+            return Win;
+        if (node->edges.size() + node->unopened_moves.size() == 0){
+            if (isCheck)
+                return Lose;
+            else
+                return Tie;
+        }
+
+        if (pos.is_draw())
+            return Tie;
+        return ContinueGame;
     }
 }

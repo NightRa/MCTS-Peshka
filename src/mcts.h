@@ -5,7 +5,7 @@
 #include "types.h"
 
 typedef int NumVisits;
-typedef float EvalType;
+typedef double EvalType;    // first check whther things work and only then change it to float
 
 class MCTS_Node;
 
@@ -30,7 +30,7 @@ struct MCTS_Edge {
 
 private:
     float compute_overall_eval() {
-        return (0.5f * (float(rolloutsSum) / numRollouts) + 0.5f * (evalSum / numEvals));
+        return (0.5f * (float(rolloutsSum) / float(numRollouts)) + 0.5f * (float(evalSum) / float(numEvals)));
     }
 };
 
@@ -55,6 +55,13 @@ public:
     inline bool fully_opened() {
         return unopened_moves.empty();
     }
+};
+
+enum PlayingResult {
+    ContinueGame = 2,
+    Win = 1,
+    Lose = -1,
+    Tie = 0
 };
 
 #endif //SRC_MCTS_H
