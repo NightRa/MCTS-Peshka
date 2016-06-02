@@ -14,7 +14,7 @@ namespace Search {
     PlayingResult getGameResult(Position& pos, MCTS_Node* node, bool isCheck);
     MCTS_Edge* select_child_UCT(MCTS_Node* node);
     void initTableBase();
-    bool isTerminal(Position& position, PlayingResult* playingResult);
+    bool isInTableBase(Position& position, PlayingResult* playingResult);
     void do_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Edge* childEdge);
     void undo_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt);
     void fillVectorWithMoves(Position& pos, std::vector<ExtMove> moves);
@@ -91,11 +91,11 @@ namespace Search {
     }
 
     PlayingResult rollout(Position& position, StateInfo*& currentStateInfo, StateInfo* lastStateInfo) {
-        PlayingResult result;
+        PlayingResult result = getGameResult(position, position.count(WHITE) + position.count(BLACK));
         ExtMove moveBuffer[MAX_PLY];
         Move movesDone[MAX_PLY];
         int filled = 0;
-        while (!isTerminal(position, &result)) {
+        while (result == ContinueGame) {
             ExtMove* startingMove = moveBuffer;
             ExtMove* endingMove = generate<LEGAL>(position, startingMove);
             Move chosenMove = sampleMove(startingMove, int(endingMove - startingMove));
@@ -107,6 +107,7 @@ namespace Search {
                 result = Tie;
                 break;
             }
+            result = getGameResult(position, position.count(WHITE) + position.count(BLACK));
         }
 
         for (int i = filled - 1; i >= 0; i--) {
@@ -114,7 +115,7 @@ namespace Search {
             position.undo_move(movesDone[i]);
         }
 
-        // Computed in isTerminal, notice reference above.
+        // Computed in getGameResult, notice reference above.
         return result;
     }
 
@@ -134,9 +135,9 @@ namespace Search {
         return pos.pieces() & ~pos.pieces(PAWN) & ~pos.pieces(KING);
     }
 
-    PlayingResult getGameResult(Position& pos, MCTS_Node* node, bool isCheck) {
+    PlayingResult getGameResult(Position& pos, int numMoves) {
         PlayingResult res;
-        if (isTerminal(pos, &res))
+        if (isInTableBase(pos, &res))
             return res;
 
         Bitboard promoted = promotedPieces(pos);
@@ -149,8 +150,8 @@ namespace Search {
             return Lose;
         }
 
-        if (node->edges.size() + node->unopened_moves.size() == 0) {
-            if (isCheck)
+        if (numMoves == 0) {
+            if (pos.checkers())
                 return Lose;
             else
                 return Tie;
@@ -161,19 +162,20 @@ namespace Search {
         return ContinueGame;
     }
 
-    bool isTerminal(Position& pos, PlayingResult* playingResult) {
+    bool isInTableBase(Position& pos, PlayingResult* playingResult) {
         if (pos.count<ALL_PIECES>(WHITE) + pos.count<ALL_PIECES>(BLACK) > TB::Cardinality)
             return false;
-        int found, v = Tablebases::probe_wdl(pos, &found);
+        int found;                       //  =>
+        int v = Tablebases::probe_wdl(pos, &found);
 
         if (!found)
             return false;
         else {
             int drawScore = TB::UseRule50 ? 1 : 0;
 
-            *playingResult = v < -drawScore ? Lose
-                                            : v > drawScore ? Win
-                                                            : Tie;
+            *playingResult = v < -drawScore     ? Lose
+                                : v > drawScore ? Win
+                                :                 Tie;
             return true;
         }
     }
