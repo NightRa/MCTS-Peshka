@@ -17,13 +17,15 @@ namespace Search {
 
     void initTableBase();
 
-    bool canGetResult(Position &position, PlayingResult *playingResult);
+    bool isTerminal(Position &position, PlayingResult *playingResult);
 
     void do_move_mcts(Position &pos, MCTS_Node *&node, StateInfo *&currentSt, MCTS_Edge *childEdge);
 
     void undo_move_mcts(Position &pos, MCTS_Node *&node, StateInfo *&currentSt);
 
     void fillVectorWithMoves(Position &pos,std::vector<ExtMove> moves);
+
+    PlayingResult rollout(Position &position, StateInfo *&currentStateInfo, StateInfo *endingStateInfo);
 
     double mctsSearch(Position &pos, MCTS_Node &root) {
         // Updated by check_time()
@@ -41,7 +43,7 @@ namespace Search {
             MCTS_Node *node = &root;
             StateInfo *currentSt = sts;
 
-            int rolloutResult;
+            PlayingResult rolloutResult;
             double evalResult;
 
             bool isCheck = false; //fill with something!
@@ -72,7 +74,7 @@ namespace Search {
                 if (currentSt == lastSt) {
                     rolloutResult = Tie;
                 } else {
-                    rolloutResult = rollout(pos);
+                    rolloutResult = rollout(pos, currentSt, lastSt);
                 }
 
                 evalResult = eval(pos, pos.side_to_move());
@@ -95,6 +97,32 @@ namespace Search {
         }
     }
 
+    PlayingResult rollout(Position &position, StateInfo *&currentStateInfo, StateInfo *lastStateInfo) {
+        PlayingResult result;
+        ExtMove moveBuffer[128];
+        Move movesDone[MAX_PLY];
+        int filled = 0;
+        while (!isTerminal(position, &result)){
+            ExtMove* startingMove = moveBuffer;
+            ExtMove* endingMove = generate<LEGAL>(position, startingMove);
+            Move chosenMove = sampleMove(startingMove, endingMove - startingMove);
+            position.do_move(chosenMove, *currentStateInfo, (bool)position.checkers());
+            movesDone[filled] = chosenMove;
+            filled++;
+            currentStateInfo++;
+            if (currentStateInfo == lastStateInfo){
+                result = Tie;
+                break;
+            }
+        }
+        for (int i = filled - 1; i >= 0; i--) {
+            currentStateInfo--;
+            position.undo_move(movesDone[i]);
+        }
+
+        return result;
+    }
+
     void do_move_mcts(Position &pos, MCTS_Node *&node, StateInfo *&currentSt, MCTS_Edge *childEdge) {
         node = &childEdge->node;
         pos.do_move(childEdge->move, *currentSt, pos.gives_check(childEdge->move, CheckInfo(pos)));
@@ -113,7 +141,7 @@ namespace Search {
 
     PlayingResult getGameResult(Position &pos, MCTS_Node *node, bool isCheck) {
         PlayingResult res;
-        if (canGetResult(pos, &res))
+        if (isTerminal(pos, &res))
             return res;
 
         Bitboard promoted = promotedPieces(pos);
@@ -138,7 +166,7 @@ namespace Search {
         return ContinueGame;
     }
 
-    bool canGetResult(Position &pos, PlayingResult *playingResult) {
+    bool isTerminal(Position &pos, PlayingResult *playingResult) {
         if (pos.count<ALL_PIECES>(WHITE) + pos.count<ALL_PIECES>(BLACK) > TB::Cardinality)
             return false;
         int found, v = Tablebases::probe_wdl(pos, &found);
