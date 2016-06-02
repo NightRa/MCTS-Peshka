@@ -42,9 +42,7 @@ void calc_priors(Position& pos, ExtMove* moves, int size) {
 }
 
 Move sampleMove(Position& pos, ExtMove* moves) {
-
-    long long int seed = std::chrono::system_clock::now().time_since_epoch().count();
-    std::mersenne_twister_engine generator(seed);
+    const std::mersenne_twister_engine& generator = pos.getGenerator();
 
     std::uniform_real_distribution<float> distribution(0.0, 1.0);
 
@@ -61,10 +59,7 @@ Move sampleMove(Position& pos, ExtMove* moves) {
 }
 
 UnopenedMove sampleMove(Position& pos, std::vector<UnopenedMove>& moves) {
-
-    long long int seed = std::chrono::system_clock::now().time_since_epoch().count();
-    std::mersenne_twister_engine generator(seed);
-
+    const std::mersenne_twister_engine& generator = pos.getGenerator();
     std::uniform_real_distribution<float> distribution(0.0, 1.0);
 
     float stopPoint = distribution(generator);

@@ -176,6 +176,8 @@ public:
   bool pos_is_ok(int* failedStep = nullptr) const;
   void flip();
 
+  std::mersenne_twister_engine getGenerator() { return generator; }
+
 private:
   // Initialization helpers (used while setting up a position)
   void clear();
