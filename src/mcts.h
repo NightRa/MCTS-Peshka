@@ -5,8 +5,14 @@
 #include "types.h"
 #include "position.h"
 #include "movepick.h"
+#include "mcts_chess_playing.h"
 
-void fillVectorWithMoves(Position& pos, std::vector<ExtMove>& moveVector, ExtMove* moveBuffer);
+namespace Search {
+    MCTS_Edge* select_child_UCT(MCTS_Node* node);
+    void do_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Edge* childEdge);
+    void undo_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt);
+    PlayingResult rollout(Position& position, StateInfo*& currentStateInfo, StateInfo* endingStateInfo);
+}
 
 typedef int NumVisits;
 typedef double EvalType;    // first check whether things work and only then change it to float
@@ -84,5 +90,4 @@ public:
     }
 };
 
-// void fillVectorWithMoves(Position &pos, std::vector<ExtMove>& moveVector, ExtMove* moveBuffer);
 #endif //SRC_MCTS_H

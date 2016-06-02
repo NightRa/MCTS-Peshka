@@ -12,9 +12,7 @@ enum PlayingResult {
 };
 
 PlayingResult getGameResult(Position& pos, int numMoves);
-
 void fillVectorWithMoves(Position& pos, std::vector<ExtMove> moves);
-
 Bitboard promotedPieces(Position& pos);
 
 #endif //SRC_MCTS_CHESS_PLAYING_H

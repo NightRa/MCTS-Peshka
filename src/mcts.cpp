@@ -4,18 +4,12 @@
 #include "mcts.h"
 #include "uci.h"
 #include "evaluate.h"
-#include "mcts_chess_playing.h"
 #include "mcts_tablebase.h"
+#include "mcts_prior.h"
 
 
 namespace Search {
     const double cpuct = 1;
-
-    MCTS_Edge* select_child_UCT(MCTS_Node* node);
-    void do_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Edge* childEdge);
-    void undo_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt);
-    PlayingResult rollout(Position& position, StateInfo*& currentStateInfo, StateInfo* endingStateInfo);
-    Move sampleMove(ExtMove* moves, int size);
 
     double mctsSearch(Position& pos, MCTS_Node& root) {
         // Updated by check_time()
@@ -86,8 +80,6 @@ namespace Search {
         }
     }
 
-    void calc_priors(Position& pos, ExtMove* moves, int size);
-
     PlayingResult rollout(Position& position, StateInfo*& currentStateInfo, StateInfo* lastStateInfo) {
         PlayingResult result = getGameResult(position, position.count(WHITE) + position.count(BLACK));
         ExtMove moveBuffer[MAX_PLY];
@@ -145,64 +137,5 @@ namespace Search {
         }
 
         return bestEdge;
-    }
-
-    // MoveBuffer is a 128 cells of ExtMoves that should be empty.
-    void fillVectorWithMoves(Position& pos, std::vector<ExtMove>& moveVector, ExtMove* moveBuffer) {
-        ExtMove* startingPointer = moveBuffer;
-        ExtMove* endingPointer = generate<LEGAL>(pos, moveBuffer);
-        while (startingPointer != endingPointer) {
-            moveVector.push_back(*startingPointer);
-            startingPointer++;
-        }
-    }
-
-    void calc_priors(Position& pos, ExtMove* moves, int size) {
-        const float normalizationFactor = 200; // Something like a pawn
-        StateInfo st;
-        const CheckInfo ci(pos);
-        float max = -VALUE_INFINITE;
-        // u.f is always the real value, u.i is always the stored repr.
-        for (int i = 0; i < size; i++) {
-            // calculate move values (heuristics)
-            pos.do_move(moves[i].move, st, pos.gives_check(moves[i], ci));
-            float eval = float(Eval::evaluate<false>(pos)) / normalizationFactor;
-            moves[i].setPrior(eval);
-            pos.undo_move(moves[i]);
-
-            max = std::max(max, eval);
-        }
-
-        double expSum = 0;
-        for (int i = 0; i < size; i++) {
-            float eval = std::exp(moves[i].getPrior() - max);
-            moves[i].setPrior(eval);
-
-            expSum += eval;
-        }
-
-        for (int i = 0; i < size; i++) {
-            double eval = double(moves[i].getPrior()) / expSum;
-            moves[i].setPrior(float(eval));
-        }
-    }
-
-    Move sampleMove(Position& pos, ExtMove* moves, int size) {
-
-        long long int seed = std::chrono::system_clock::now().time_since_epoch().count();
-        std::mersenne_twister_engine generator(seed);
-
-        std::uniform_real_distribution<float> distribution(0.0, 1.0);
-
-        float stopPoint = distribution(generator);
-
-        float partialSum = 0;
-        int i = 0;
-        while (partialSum <= stopPoint) {
-            partialSum += moves[i].getPrior();
-            i++;
-        }
-
-        return moves[i - 1];
     }
 }
