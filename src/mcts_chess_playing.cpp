@@ -1,4 +1,4 @@
-#include <c++/4.8.3/vector>
+#include <vector>
 #include "mcts_chess_playing.h"
 #include "mcts_tablebase.h"
 
