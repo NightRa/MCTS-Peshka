@@ -1,8 +1,9 @@
 #include <cmath>
-#include <c++/5.2.0/algorithm>
+#include <algorithm>
 #include <syzygy/tbprobe.h>
 #include "mcts.h"
 #include "uci.h"
+
 namespace TB = Tablebases;
 
 namespace Search {
@@ -15,51 +16,76 @@ namespace Search {
     MCTS_Edge *select_child_UCT(MCTS_Node *node);
 
     void initTableBase();
+
     bool canGetResult(Position &position, PlayingResult *playingResult);
+
+    void do_move_mcts(Position &pos, MCTS_Node *&node, StateInfo *&currentSt, MCTS_Edge *childEdge);
+
+    void undo_move_mcts(Position &pos, MCTS_Node *&node, StateInfo *&currentSt);
 
     double mctsSearch(Position &pos, MCTS_Node &root) {
         // Updated by check_time()
         initTableBase();
+
+        int MAX_DEPTH = 256;
+
+        StateInfo sts[MAX_DEPTH];
+        StateInfo *lastSt = sts + MAX_DEPTH;
+
         int iteration = 0;
         while (!Signals.stop) {
             iteration++;
 
             MCTS_Node *node = &root;
+            StateInfo *currentSt = sts;
 
             int rolloutResult;
             double evalResult;
+
             bool isCheck = false; //fill with something!
             PlayingResult gameResult = getGameResult(pos, node, isCheck);
 
             while (gameResult == ContinueGame && !node->fully_opened()) {
                 MCTS_Edge *child = select_child_UCT(node);
-                node = &child->node;
-                pos.do_move(child->move, st, gives_check);
-                gameResult = getGameResult(pos, node, isCheck);
+                do_move_mcts(pos, node, currentSt, child);
+
+                // If we reach the maximum depth, assume repeat or whatever.
+                if (currentSt == lastSt) {
+                    gameResult = Tie;
+                } else {
+                    gameResult = getGameResult(pos, node, isCheck);
+                }
             }
+
             if (gameResult != ContinueGame) {
 
                 rolloutResult = gameResult;
                 evalResult = rolloutResult;
 
-            } else { // at leaf / not fully opened.
+            } else { // at leaf = not fully opened.
                 MCTS_Edge *childEdge = node->open_child(pos);
 
+                do_move_mcts(pos, node, currentSt, childEdge);
 
-                node = &childEdge->node;
-                pos.do_move(childEdge->move, st, gives_check);
+                if (currentSt == lastSt) {
+                    rolloutResult = Tie;
+                } else {
+                    rolloutResult = rollout(pos);
+                }
 
-                rolloutResult = rollout(pos);
                 evalResult = eval(pos, pos.side_to_move());
             }
 
             // Back propagation
             while (node->incoming_edge != nullptr) {
                 node->incoming_edge->update_stats(rolloutResult, evalResult);
-                pos.undo_move(node->incoming_edge->move);
-                node = node->incoming_edge->parent;
+
+                MCTS_Edge *childEdge = node->incoming_edge;
+
+                undo_move_mcts(pos, node, currentSt);
+
                 // Update max stats in the parent
-                node->update_child_stats(rolloutResult, evalResult);
+                node->update_child_stats(childEdge);
                 // Nega-max
                 rolloutResult = -rolloutResult;
                 evalResult = -evalResult;
@@ -67,14 +93,37 @@ namespace Search {
         }
     }
 
+    void do_move_mcts(Position &pos, MCTS_Node *&node, StateInfo *&currentSt, MCTS_Edge *childEdge) {
+        node = &childEdge->node;
+        pos.do_move(childEdge->move, *currentSt, pos.gives_check(childEdge->move, CheckInfo(pos)));
+        currentSt++;
+    }
+
+    void undo_move_mcts(Position &pos, MCTS_Node *&node, StateInfo *&currentSt) {
+        pos.undo_move(node->incoming_edge->move);
+        node = node->incoming_edge->parent;
+        currentSt--;
+    }
+
+    Bitboard promotedPieces(Position& pos) {
+        return pos.pieces() & ~pos.pieces(PAWN) & ~pos.pieces(KING);
+    }
 
     PlayingResult getGameResult(Position &pos, MCTS_Node *node, bool isCheck) {
         PlayingResult res;
         if (canGetResult(pos, &res))
             return res;
 
-        if ((pos.pieces() & ~pos.pieces(PAWN) & ~pos.pieces(KING)) != 0)
+        Bitboard promoted = promotedPieces(pos);
+        Color sideToMove = pos.side_to_move();
+        Bitboard ourPromoted = pos.pieces(sideToMove) & promoted;
+
+        if (ourPromoted)
             return Win;
+        if (promoted /*&& !ourPromoted*/) {
+            return Lose;
+        }
+
         if (node->edges.size() + node->unopened_moves.size() == 0) {
             if (isCheck)
                 return Lose;
@@ -98,8 +147,8 @@ namespace Search {
             int drawScore = TB::UseRule50 ? 1 : 0;
 
             *playingResult = v < -drawScore ? Lose
-                           : v > drawScore  ? Win
-                           :                  Tie;
+                           : v >  drawScore ? Win
+                                            : Tie;
             return true;
         }
     }
@@ -112,8 +161,7 @@ namespace Search {
         TB::Cardinality = Options["SyzygyProbeLimit"];
 
         // Skip TB probing when no TB found: !TBLargest -> !TB::Cardinality
-        if (TB::Cardinality > TB::MaxCardinality)
-        {
+        if (TB::Cardinality > TB::MaxCardinality) {
             TB::Cardinality = TB::MaxCardinality;
             TB::ProbeDepth = DEPTH_ZERO;
         }
