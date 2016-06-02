@@ -95,7 +95,7 @@ namespace Search {
             int movesSize = int(endingMove - startingMove);
             calc_priors(position, startingMove, movesSize);
 
-            Move chosenMove = sampleMove(position, startingMove, movesSize);
+            Move chosenMove = sampleMove(position, startingMove);
             position.do_move(chosenMove, *currentStateInfo, position.gives_check(chosenMove, CheckInfo(position)));
             movesDone[filled] = chosenMove;
             filled++;

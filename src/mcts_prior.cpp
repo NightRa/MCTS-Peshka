@@ -2,7 +2,6 @@
 #include <chrono>
 #include <random>
 #include "mcts_prior.h"
-#include "position.h"
 #include "evaluate.h"
 
 // e^(x/t - max)
@@ -61,7 +60,7 @@ Move sampleMove(Position& pos, ExtMove* moves) {
     return moves[i - 1];
 }
 
-Move sampleMove(Position& pos, std::vector<ExtMove>& moves) {
+UnopenedMove sampleMove(Position& pos, std::vector<UnopenedMove>& moves) {
 
     long long int seed = std::chrono::system_clock::now().time_since_epoch().count();
     std::mersenne_twister_engine generator(seed);
@@ -73,7 +72,7 @@ Move sampleMove(Position& pos, std::vector<ExtMove>& moves) {
     float partialSum = 0;
     int i = 0;
     while (partialSum <= stopPoint) {
-        partialSum += moves[i].getPrior();
+        partialSum += moves[i].relativePrior;
         i++;
     }
 

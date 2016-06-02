@@ -41,6 +41,10 @@ struct MCTS_Edge {
         overallEval = compute_overall_eval();
     }
 
+    MCTS_Edge(Move move, float prior, MCTS_Node* parent) : node(this), move(move), prior(prior), parent(parent) {
+        overallEval = prior;
+    }
+
 private:
     float compute_overall_eval() {
         return (0.5f * (float(rolloutsSum) / float(numRollouts)) + 0.5f * (float(evalSum) / float(numEvals)));
@@ -50,7 +54,8 @@ private:
 struct UnopenedMove {
     Move move;
     float expPrior;
-    float prior; // In [0, 1], devided by the sum of e^x
+    float relativePrior;
+    float prior; // In [0, 1], devided by the sum of all e^x
 
     UnopenedMove(Move move, float expPrior, float prior) : move(move), expPrior(expPrior), prior(prior) {}
 };
@@ -81,20 +86,20 @@ struct UnopenedMoves {
             buffer++;
         }
     }
-    
+
     void remove(UnopenedMove move) {
         unopened_moves.erase(std::remove(unopened_moves.begin(), unopened_moves.end(), move), unopened_moves.end());
         sumUnopenedPriorExps -= move.expPrior;
         for (int i = 0; i < size(); i++) {
             UnopenedMove& move_to_update = unopened_moves[i];
-            move_to_update.prior = float(move_to_update.expPrior / sumUnopenedPriorExps);
+            move_to_update.relativePrior = float(move_to_update.expPrior / sumUnopenedPriorExps);
         }
     }
-    
+
     inline bool empty() {
         return unopened_moves.empty();
     }
-    
+
     inline int size() {
         return int(unopened_moves.size());
     }
@@ -154,9 +159,12 @@ public:
         // Precondition: not terminal, leaf => possible moves not empty
         initialize(pos, moveBuffer);
         // unopened_moves not empty.
-        sampleMove(pos, unopened_moves.unopened_moves);
         // sample move according to prior probabilities / take maximal probability
+        UnopenedMove move = sampleMove(pos, unopened_moves.unopened_moves);
         // remove it from unopened_moves and insert to edges.
+        unopened_moves.remove(move);
+        edges.push_back(MCTS_Edge(move.move, move.prior, this));
+        return &edges[edges.size() - 1];
     }
 };
 
