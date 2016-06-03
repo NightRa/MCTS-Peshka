@@ -887,7 +887,7 @@ moves_loop: // When in check search starts from here
       if (RootNode && thisThread == Threads.main() && Time.elapsed() > 3000)
             sync_cout << "info depth " << depth / ONE_PLY
             << " currmove " << UCI::move(move, pos.is_chess960())
-            << " currmovenumber " << moveCount + thisThread->PVIdx << sync_endl;
+            << " currmovenumber " << moveCount + thisThread->PVIdx << sync_endl;887
 
         if (PvNode)
             (ss+1)->pv = nullptr;

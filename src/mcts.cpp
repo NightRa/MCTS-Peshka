@@ -10,13 +10,8 @@
 #include "mcts_pv.h"
 
 namespace Search {
-    const double cpuct = 1;
-    const float evalWeight = 0.2;
-    const int pvThreshold = 7;
 
     double eval(Position& pos);
-
-    MCTS_PV mctsPv(MCTS_Node& node);
 
     void mctsSearch(Position& pos, MCTS_Node& root) {
         // Updated by check_time()
@@ -88,29 +83,10 @@ namespace Search {
 
             // optionally print move
             if (Time.elapsed() > 1000 && iteration % 100 == 0) {
-               //
-               // Move bestMove = best.base()->move;
-                MCTS_PV pv = mctsPv(root);
-                sync_cout << pv.asString() << sync_endl;
+                sync_cout << mcts_pv_print(root) << sync_endl;
             }
             // check-out search.cpp line 887
         }
-    }
-
-    MCTS_PV mctsPv(MCTS_Node& node) {
-        if (!node.fully_opened() /*leaf*/ || node.totalVisits < pvThreshold) {
-           // std::vector<Move> vec(2);
-            //vec.push_back(node.incoming_edge->move);
-            return MCTS_PV(std::vector<Move>(0), 0 /*changed in rec*/, Time.elapsed() + 1, 0, Threads.nodes_searched());
-        }
-        auto best = std::max_element(node.edges.begin(), node.edges.end(), [](MCTS_Edge edge){ return edge.numRollouts; });
-        MCTS_Edge& bestEdge = *best;
-        MCTS_PV childPv = mctsPv(bestEdge.node);
-        childPv.depth++;
-        childPv.moves.push_back(bestEdge.move);
-        if (node.incoming_edge == nullptr)
-            childPv.score = bestEdge.score();
-        return childPv;
     }
 
 

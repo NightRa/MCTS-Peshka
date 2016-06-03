@@ -9,6 +9,10 @@
 #include "mcts_prior.h"
 
 namespace Search {
+    const double cpuct = 1;
+    const float evalWeight = 0.2;
+    const int pvThreshold = 7;
+
     MCTS_Edge* select_child_UCT(MCTS_Node* node);
     void do_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Edge* childEdge);
     void undo_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt);
@@ -31,11 +35,8 @@ struct MCTS_Edge {
     float overallEval;
     MCTS_Node* parent;
 
-    // Don't forget to initialize overallEval with the Prior
-
-    int score (){
-        //TODO: Implement
-        return 0;
+    int score () {
+        return (int) ((overallEval * 30) * PawnValueEg);
     }
 
     void update_stats(int rolloutResult, double evalResult, float evalWeight) {

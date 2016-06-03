@@ -1,10 +1,10 @@
-
 #ifndef SRC_MCTS_PV_H
 #define SRC_MCTS_PV_H
 
 #include <vector>
 #include <string>
 #include "types.h"
+#include "mcts.h"
 
 struct MCTS_PV {
 public:
@@ -21,10 +21,9 @@ public:
             time(time),
             score(score),
             nodesVisited(nodesVisited) {}
-
-    std::string asString() {
-        //TODO: Implement
-    }
 };
+
+MCTS_PV mctsPv(MCTS_Node& node);
+std::string mcts_pv_print(MCTS_Node& root);
 
 #endif
