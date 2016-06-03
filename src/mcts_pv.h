@@ -15,12 +15,12 @@ public:
     int64_t nodesVisited;
 
 
-    MCTS_PV(const std::vector<Move>& moves, int depth, int time, int score, int64_t nodesVisited) :
-            moves(moves),
-            depth(depth),
-            time(time),
-            score(score),
-            nodesVisited(nodesVisited) {}
+    MCTS_PV(const std::vector<Move>& _moves, int _depth, int _time, int _score, int64_t _nodesVisited) :
+            moves(_moves),
+            depth(_depth),
+            time(_time),
+            score(_score),
+            nodesVisited(_nodesVisited) {}
 };
 
 MCTS_PV mctsPv(MCTS_Node& node);

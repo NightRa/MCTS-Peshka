@@ -2,7 +2,20 @@
 #define SRC_MCTS_PRIOR_H
 
 #include "movegen.h"
-#include "mcts.h"
+
+struct UnopenedMove {
+    Move move;
+    float expPrior;
+    float relativePrior;
+    float prior; // In [0, 1], devided by the sum of all e^x
+
+    UnopenedMove(Move _move, float _expPrior, float _prior) : move(_move), expPrior(_expPrior), prior(_prior) {}
+    UnopenedMove() = default;
+
+    bool operator==(const UnopenedMove& other) {
+        return move == other.move;
+    }
+};
 
 void calc_exp_evals(Position& pos, ExtMove* moves, int size);
 void calc_priors(Position& pos, ExtMove* moves, int size);

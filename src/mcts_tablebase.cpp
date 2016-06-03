@@ -1,15 +1,7 @@
-#include <syzygy/tbprobe.h>
+#include "syzygy/tbprobe.h"
 #include "mcts_tablebase.h"
 #include "uci.h"
 
-namespace Tablebases {
-    int Cardinality;
-    uint64_t Hits;
-    bool RootInTB;
-    bool UseRule50;
-    Depth ProbeDepth;
-    Value Score;
-}
 
 namespace TB = Tablebases;
 

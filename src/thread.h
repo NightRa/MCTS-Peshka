@@ -80,6 +80,8 @@ struct MainThread : public Thread {
 
   bool easyMovePlayed, failedLow;
   double bestMoveChanges;
+    void stockfish_main_search();
+    void mcts_main_search();
 };
 
 

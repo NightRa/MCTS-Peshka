@@ -1,6 +1,6 @@
 #include <cmath>
 #include <algorithm>
-#include <syzygy/tbprobe.h>
+#include "syzygy/tbprobe.h"
 #include <iostream>
 #include "mcts.h"
 #include "uci.h"
@@ -28,7 +28,7 @@ namespace Search {
             MCTS_Node* node = &root;
             StateInfo* currentSt = sts;
 
-            PlayingResult rolloutResult;
+            int rolloutResult;
             double evalResult;
 
             PlayingResult gameResult = getGameResult(pos, node->getNumMoves(pos, moveBuffer));
@@ -60,7 +60,7 @@ namespace Search {
                 if (currentSt == lastSt) {
                     rolloutResult = Tie;
                 } else {
-                    rolloutResult = rollout(pos, currentSt, lastSt);
+                    rolloutResult = rollout(pos, currentSt, lastSt, moveBuffer);
                 }
 
                 evalResult = eval(pos);
@@ -93,20 +93,20 @@ namespace Search {
     }
 
 
-    PlayingResult rollout(Position& position, StateInfo*& currentStateInfo, StateInfo* lastStateInfo) {
-        PlayingResult result = getGameResult(position, position.count(WHITE) + position.count(BLACK));
-        ExtMove moveBuffer[MAX_PLY];
+    PlayingResult rollout(Position& pos, StateInfo*& currentStateInfo, StateInfo* lastStateInfo, ExtMove* moveBuffer) {
+        // TODO: Don't initialize in getNumMoves
+        PlayingResult result = getGameResult(pos, getNumMoves(pos, moveBuffer));
         Move movesDone[MAX_PLY];
         int filled = 0;
         while (result == ContinueGame) {
             ExtMove* startingMove = moveBuffer;
 
-            ExtMove* endingMove = generate<LEGAL>(position, startingMove);
+            ExtMove* endingMove = generate<LEGAL>(pos, startingMove);
             int movesSize = int(endingMove - startingMove);
-            calc_priors(position, startingMove, movesSize);
+            calc_priors(pos, startingMove, movesSize);
 
-            Move chosenMove = sampleMove(position, startingMove);
-            position.do_move(chosenMove, *currentStateInfo, position.gives_check(chosenMove, CheckInfo(position)));
+            Move chosenMove = sampleMove(pos, startingMove);
+            pos.do_move(chosenMove, *currentStateInfo, pos.gives_check(chosenMove, CheckInfo(pos)));
             movesDone[filled] = chosenMove;
             filled++;
             currentStateInfo++;
@@ -114,12 +114,12 @@ namespace Search {
                 result = Tie;
                 break;
             }
-            result = getGameResult(position, position.count(WHITE) + position.count(BLACK));
+            result = getGameResult(pos, getNumMoves(pos, moveBuffer));
         }
 
         for (int i = filled - 1; i >= 0; i--) {
             currentStateInfo--;
-            position.undo_move(movesDone[i]);
+            pos.undo_move(movesDone[i]);
         }
 
         // Computed in getGameResult, notice reference above.
@@ -167,4 +167,37 @@ namespace Search {
     }
 
 
+}
+
+void MCTS_Node::update_child_stats(MCTS_Edge* childEdge) {
+    totalVisits++;
+    maxVisits = std::max(maxVisits, childEdge->numRollouts);
+}
+
+MCTS_Edge* MCTS_Node::open_child(Position& pos, ExtMove* moveBuffer) {
+    // Precondition: not terminal, leaf => possible moves not empty
+    initialize(pos, moveBuffer);
+    // unopened_moves not empty.
+    // sample move according to prior probabilities / take maximal probability
+    UnopenedMove move = sampleMove(pos, unopened_moves.unopened_moves);
+    // remove it from unopened_moves and insert to edges.
+    unopened_moves.remove(move);
+    edges.push_back(MCTS_Edge(move.move, move.prior, this));
+    return &edges[edges.size() - 1];
+}
+
+MCTS_Edge* MCTS_Node::selectBest() {
+    if (!initialized) {
+        return nullptr;
+    } else {
+        NumVisits max_visits = 0;
+        MCTS_Edge* maxEdge = nullptr;
+        for (MCTS_Edge& edge: edges) {
+            if (edge.numRollouts > max_visits) {
+                max_visits = edge.numRollouts;
+                maxEdge = &edge;
+            }
+        }
+        return maxEdge;
+    }
 }

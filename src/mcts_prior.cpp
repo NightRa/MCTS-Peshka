@@ -3,6 +3,7 @@
 #include <random>
 #include "mcts_prior.h"
 #include "evaluate.h"
+#include "position.h"
 
 // e^(x/t - max)
 void calc_exp_evals(Position& pos, ExtMove* moves, int size) {
@@ -42,8 +43,7 @@ void calc_priors(Position& pos, ExtMove* moves, int size) {
 }
 
 Move sampleMove(Position& pos, ExtMove* moves) {
-    const std::mersenne_twister_engine& generator = pos.getGenerator();
-
+    auto generator = pos.getGenerator();
     std::uniform_real_distribution<float> distribution(0.0, 1.0);
 
     float stopPoint = distribution(generator);
@@ -59,7 +59,7 @@ Move sampleMove(Position& pos, ExtMove* moves) {
 }
 
 UnopenedMove sampleMove(Position& pos, std::vector<UnopenedMove>& moves) {
-    const std::mersenne_twister_engine& generator = pos.getGenerator();
+    auto generator = pos.getGenerator();
     std::uniform_real_distribution<float> distribution(0.0, 1.0);
 
     float stopPoint = distribution(generator);

@@ -8,64 +8,8 @@
 #include "mcts_chess_playing.h"
 #include "mcts_prior.h"
 
-namespace Search {
-    const double cpuct = 1;
-    const float evalWeight = 0.2;
-    const int pvThreshold = 7;
-
-    MCTS_Edge* select_child_UCT(MCTS_Node* node);
-    void do_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Edge* childEdge);
-    void undo_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt);
-    PlayingResult rollout(Position& position, StateInfo*& currentStateInfo, StateInfo* endingStateInfo);
-}
-
 typedef int NumVisits;
 typedef double EvalType;    // first check whether things work and only then change it to float
-
-class MCTS_Node;
-
-struct MCTS_Edge {
-    MCTS_Node node;
-    Move move;
-    float prior;
-    EvalType evalSum;
-    NumVisits numEvals;
-    NumVisits rolloutsSum;
-    NumVisits numRollouts;
-    float overallEval;
-    MCTS_Node* parent;
-
-    int score () {
-        return (int) ((overallEval * 30) * PawnValueEg);
-    }
-
-    void update_stats(int rolloutResult, double evalResult, float evalWeight) {
-        rolloutsSum += rolloutResult;
-        numRollouts += 1;
-        evalSum += evalResult;
-        numEvals += 1;
-        overallEval = compute_overall_eval(evalWeight);
-    }
-
-    MCTS_Edge(Move move, float prior, MCTS_Node* parent) : node(this), move(move), prior(prior), parent(parent) {
-        overallEval = prior;
-    }
-
-private:
-    float compute_overall_eval(float evalWeight) {
-        return ((1 - evalWeight) * (float(rolloutsSum) / float(numRollouts)) +
-                (evalWeight) * (float(evalSum) / float(numEvals)));
-    }
-};
-
-struct UnopenedMove {
-    Move move;
-    float expPrior;
-    float relativePrior;
-    float prior; // In [0, 1], devided by the sum of all e^x
-
-    UnopenedMove(Move move, float expPrior, float prior) : move(move), expPrior(expPrior), prior(prior) {}
-};
 
 struct UnopenedMoves {
     std::vector<UnopenedMove> unopened_moves;
@@ -75,9 +19,9 @@ struct UnopenedMoves {
 
     inline void initialize(Position& pos, ExtMove* buffer) {
         ExtMove* end = generate<LEGAL>(pos, buffer);
-        unsigned long numMoves = end - buffer;
+        int numMoves = int(end - buffer);
         // Calculate e^(x/t - max) for all elements in the buffer.
-        calc_exp_evals(pos, buffer, int(numMoves));
+        calc_exp_evals(pos, buffer, numMoves);
         // And write the ExtMoves with the correct Priors to the moves vector.
         unopened_moves.resize(numMoves);
 
@@ -95,7 +39,11 @@ struct UnopenedMoves {
     }
 
     void remove(UnopenedMove move) {
-        unopened_moves.erase(std::remove(unopened_moves.begin(), unopened_moves.end(), move), unopened_moves.end());
+        const std::vector<UnopenedMove>::iterator& iterator = std::find(unopened_moves.begin(), unopened_moves.end(), move);
+        auto it = iterator;
+        if(it != unopened_moves.end())
+            unopened_moves.erase(it);
+
         sumUnopenedPriorExps -= move.expPrior;
         for (int i = 0; i < size(); i++) {
             UnopenedMove& move_to_update = unopened_moves[i];
@@ -112,6 +60,8 @@ struct UnopenedMoves {
     }
 
 };
+
+struct MCTS_Edge;
 
 class MCTS_Node {
 public:
@@ -130,12 +80,6 @@ public:
     MCTS_Node(MCTS_Edge* parent) : initialized(false), edges(0 /*Init with size 0*/), maxVisits(0), totalVisits(0),
                                    incoming_edge(parent) {}
 
-    ~MCTS_Node() {
-        if (edges != nullptr) {
-            delete[] edges;
-        }
-    }
-
     inline bool fully_opened() {
         return initialized && unopened_moves.empty();
     }
@@ -144,10 +88,7 @@ public:
         return initialized && unopened_moves.empty() && edges.empty();
     }
 
-    void update_child_stats(MCTS_Edge* childEdge) {
-        totalVisits++;
-        maxVisits = std::max(maxVisits, childEdge->numRollouts);
-    }
+    void update_child_stats(MCTS_Edge* childEdge);
 
     int getNumMoves(Position& pos, ExtMove* buffer) {
         // Notice that always when we use getNumMoves, we immediately after initialize.
@@ -162,17 +103,57 @@ public:
         }
     }
 
-    MCTS_Edge* open_child(Position& pos, ExtMove* moveBuffer) {
-        // Precondition: not terminal, leaf => possible moves not empty
-        initialize(pos, moveBuffer);
-        // unopened_moves not empty.
-        // sample move according to prior probabilities / take maximal probability
-        UnopenedMove move = sampleMove(pos, unopened_moves.unopened_moves);
-        // remove it from unopened_moves and insert to edges.
-        unopened_moves.remove(move);
-        edges.push_back(MCTS_Edge(move.move, move.prior, this));
-        return &edges[edges.size() - 1];
+    MCTS_Edge* selectBest();
+
+    MCTS_Edge* open_child(Position& pos, ExtMove* moveBuffer);
+};
+
+struct MCTS_Edge {
+    MCTS_Node node;
+    Move move;
+    float prior;
+    EvalType evalSum;
+    NumVisits numEvals;
+    NumVisits rolloutsSum;
+    NumVisits numRollouts;
+    float overallEval;
+    MCTS_Node* parent;
+
+    int score () {
+        return (int) ((overallEval * 30) * int(PawnValueEg));
+    }
+
+    void update_stats(int rolloutResult, double evalResult, float evalWeight) {
+        rolloutsSum += rolloutResult;
+        numRollouts += 1;
+        evalSum += evalResult;
+        numEvals += 1;
+        overallEval = compute_overall_eval(evalWeight);
+    }
+
+    MCTS_Edge(Move _move, float _prior, MCTS_Node* _parent) : node(this), move(_move), prior(_prior), parent(_parent) {
+        overallEval = _prior;
+    }
+
+    MCTS_Edge() {}
+
+private:
+    float compute_overall_eval(float evalWeight) {
+        return ((1 - evalWeight) * (float(rolloutsSum) / float(numRollouts)) +
+                (evalWeight) * (float(evalSum) / float(numEvals)));
     }
 };
+
+namespace Search {
+    const double cpuct = 1;
+    const float evalWeight = 0.2;
+    const int pvThreshold = 7;
+
+    void mctsSearch(Position& pos, MCTS_Node& root);
+    MCTS_Edge* select_child_UCT(MCTS_Node* node);
+    void do_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Edge* childEdge);
+    void undo_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt);
+    PlayingResult rollout(Position& pos, StateInfo*& currentStateInfo, StateInfo* lastStateInfo, ExtMove* moveBuffer);
+}
 
 #endif //SRC_MCTS_H

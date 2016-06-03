@@ -35,6 +35,8 @@
 #include "tt.h"
 #include "uci.h"
 #include "syzygy/tbprobe.h"
+#include "mcts.h"
+#include "mcts_pv.h"
 
 namespace Search {
 
@@ -224,129 +226,231 @@ template uint64_t Search::perft<true>(Position&, Depth);
 /// the UCI 'go' command. It searches from root position and at the end prints
 /// the "bestmove" to output.
 
+void MainThread::stockfish_main_search() {
+    Color us = rootPos.side_to_move();
+    Time.init(Limits, us, rootPos.game_ply());
+
+    int contempt = Options["Contempt"] * PawnValueEg / 100; // From centipawns
+    DrawValue[ us] = VALUE_DRAW - Value(contempt);
+    DrawValue[~us] = VALUE_DRAW + Value(contempt);
+
+    TB::Hits = 0;
+    TB::RootInTB = false;
+    TB::UseRule50 = Options["Syzygy50MoveRule"];
+    TB::ProbeDepth = Options["SyzygyProbeDepth"] * ONE_PLY;
+    TB::Cardinality = Options["SyzygyProbeLimit"];
+
+    // Skip TB probing when no TB found: !TBLargest -> !TB::Cardinality
+    if (TB::Cardinality > TB::MaxCardinality)
+    {
+        TB::Cardinality = TB::MaxCardinality;
+        TB::ProbeDepth = DEPTH_ZERO;
+    }
+
+    if (rootMoves.empty())
+    {
+        rootMoves.push_back(RootMove(MOVE_NONE));
+        sync_cout << "info depth 0 score "
+                  << UCI::value(rootPos.checkers() ? -VALUE_MATE : VALUE_DRAW)
+                  << sync_endl;
+    }
+    else
+    {
+        if (TB::Cardinality >=  rootPos.count<ALL_PIECES>(WHITE)
+                                + rootPos.count<ALL_PIECES>(BLACK))
+        {
+            // If the current root position is in the tablebases then RootMoves
+            // contains only moves that preserve the draw or win.
+            TB::RootInTB = Tablebases::root_probe(rootPos, rootMoves, TB::Score);
+
+            if (TB::RootInTB)
+                TB::Cardinality = 0; // Do not probe tablebases during the search
+
+            else // If DTZ tables are missing, use WDL tables as a fallback
+            {
+                // Filter out moves that do not preserve a draw or win
+                TB::RootInTB = Tablebases::root_probe_wdl(rootPos, rootMoves, TB::Score);
+
+                // Only probe during search if winning
+                if (TB::Score <= VALUE_DRAW)
+                    TB::Cardinality = 0;
+            }
+
+            if (TB::RootInTB)
+            {
+                TB::Hits = rootMoves.size();
+
+                if (!TB::UseRule50)
+                    TB::Score =  TB::Score > VALUE_DRAW ?  VALUE_MATE - MAX_PLY - 1
+                                                        : TB::Score < VALUE_DRAW ? -VALUE_MATE + MAX_PLY + 1
+                                                                                 :  VALUE_DRAW;
+            }
+        }
+
+        for (Thread* th : Threads)
+        {
+            th->maxPly = 0;
+            th->rootDepth = DEPTH_ZERO;
+            if (th != this)
+            {
+                th->rootPos = Position(rootPos, th);
+                th->rootMoves = rootMoves;
+                th->start_searching();
+            }
+        }
+
+        Thread::search(); // Let's start searching!
+    }
+
+    // When playing in 'nodes as time' mode, subtract the searched nodes from
+    // the available ones before to exit.
+    if (Limits.npmsec)
+        Time.availableNodes += Limits.inc[us] - Threads.nodes_searched();
+
+    // When we reach the maximum depth, we can arrive here without a raise of
+    // Signals.stop. However, if we are pondering or in an infinite search,
+    // the UCI protocol states that we shouldn't print the best move before the
+    // GUI sends a "stop" or "ponderhit" command. We therefore simply wait here
+    // until the GUI sends one of those commands (which also raises Signals.stop).
+    if (!Signals.stop && (Limits.ponder || Limits.infinite))
+    {
+        Signals.stopOnPonderhit = true;
+        wait(Signals.stop);
+    }
+
+    // Stop the threads if not already stopped
+    Signals.stop = true;
+
+    // Wait until all threads have finished
+    for (Thread* th : Threads)
+        if (th != this)
+            th->wait_for_search_finished();
+
+    // Check if there are threads with a better score than main thread
+    Thread* bestThread = this;
+    if (   !this->easyMovePlayed
+           &&  Options["MultiPV"] == 1
+           && !Skill(Options["Skill Level"]).enabled())
+    {
+        for (Thread* th : Threads)
+            if (   th->completedDepth > bestThread->completedDepth
+                   && th->rootMoves[0].score > bestThread->rootMoves[0].score)
+                bestThread = th;
+    }
+
+    // Send new PV when needed
+    if (bestThread != this)
+        sync_cout << UCI::pv(bestThread->rootPos, bestThread->completedDepth, -VALUE_INFINITE, VALUE_INFINITE) << sync_endl;
+
+    sync_cout << "bestmove " << UCI::move(bestThread->rootMoves[0].pv[0], rootPos.is_chess960());
+
+    if (bestThread->rootMoves[0].pv.size() > 1 || bestThread->rootMoves[0].extract_ponder_from_tt(rootPos))
+        std::cout << " ponder " << UCI::move(bestThread->rootMoves[0].pv[1], rootPos.is_chess960());
+
+    std::cout << sync_endl;
+}
+
+
+void MainThread::mcts_main_search() {
+    MCTS_Node mcts_root;
+
+    Color us = rootPos.side_to_move();
+    Time.init(Limits, us, rootPos.game_ply());
+
+    int contempt = Options["Contempt"] * PawnValueEg / 100; // From centipawns
+    DrawValue[ us] = VALUE_DRAW - Value(contempt);
+    DrawValue[~us] = VALUE_DRAW + Value(contempt);
+
+    TB::Hits = 0;
+    TB::RootInTB = false;
+    TB::UseRule50 = Options["Syzygy50MoveRule"];
+    TB::ProbeDepth = Options["SyzygyProbeDepth"] * ONE_PLY;
+    TB::Cardinality = Options["SyzygyProbeLimit"];
+
+    // Skip TB probing when no TB found: !TBLargest -> !TB::Cardinality
+    if (TB::Cardinality > TB::MaxCardinality)
+    {
+        TB::Cardinality = TB::MaxCardinality;
+        TB::ProbeDepth = DEPTH_ZERO;
+    }
+
+    if (rootMoves.empty())
+    {
+        rootMoves.push_back(RootMove(MOVE_NONE));
+        sync_cout << "info depth 0 score "
+                  << UCI::value(rootPos.checkers() ? -VALUE_MATE : VALUE_DRAW)
+                  << sync_endl;
+    }
+    else
+    {
+        if (TB::Cardinality >=  rootPos.count<ALL_PIECES>(WHITE)
+                                + rootPos.count<ALL_PIECES>(BLACK))
+        {
+            // If the current root position is in the tablebases then RootMoves
+            // contains only moves that preserve the draw or win.
+            TB::RootInTB = Tablebases::root_probe(rootPos, rootMoves, TB::Score);
+
+            if (TB::RootInTB)
+                TB::Cardinality = 0; // Do not probe tablebases during the search
+
+            else // If DTZ tables are missing, use WDL tables as a fallback
+            {
+                // Filter out moves that do not preserve a draw or win
+                TB::RootInTB = Tablebases::root_probe_wdl(rootPos, rootMoves, TB::Score);
+
+                // Only probe during search if winning
+                if (TB::Score <= VALUE_DRAW)
+                    TB::Cardinality = 0;
+            }
+
+            if (TB::RootInTB)
+            {
+                TB::Hits = rootMoves.size();
+
+                if (!TB::UseRule50)
+                    TB::Score =  TB::Score > VALUE_DRAW ?  VALUE_MATE - MAX_PLY - 1
+                                                        : TB::Score < VALUE_DRAW ? -VALUE_MATE + MAX_PLY + 1
+                                                                                 :  VALUE_DRAW;
+            }
+        }
+        mctsSearch(rootPos, mcts_root);
+    }
+
+    // When playing in 'nodes as time' mode, subtract the searched nodes from
+    // the available ones before to exit.
+    if (Limits.npmsec)
+        Time.availableNodes += Limits.inc[us] - Threads.nodes_searched();
+
+    // When we reach the maximum depth, we can arrive here without a raise of
+    // Signals.stop. However, if we are pondering or in an infinite search,
+    // the UCI protocol states that we shouldn't print the best move before the
+    // GUI sends a "stop" or "ponderhit" command. We therefore simply wait here
+    // until the GUI sends one of those commands (which also raises Signals.stop).
+    if (!Signals.stop && (Limits.ponder || Limits.infinite))
+    {
+        Signals.stopOnPonderhit = true;
+        wait(Signals.stop);
+    }
+
+    // Stop the threads if not already stopped
+    Signals.stop = true;
+
+    // Send new PV when needed
+    sync_cout << mcts_pv_print(mcts_root) << sync_endl;
+
+
+    if(mcts_root.initialized) {
+        MCTS_Edge& bestEdge = *mcts_root.selectBest();
+
+        sync_cout << "bestmove " << UCI::move(bestEdge.move, rootPos.is_chess960());
+    }
+
+
+    std::cout << sync_endl;
+}
+
 void MainThread::search() {
-
-  Color us = rootPos.side_to_move();
-  Time.init(Limits, us, rootPos.game_ply());
-
-  int contempt = Options["Contempt"] * PawnValueEg / 100; // From centipawns
-  DrawValue[ us] = VALUE_DRAW - Value(contempt);
-  DrawValue[~us] = VALUE_DRAW + Value(contempt);
-
-  TB::Hits = 0;
-  TB::RootInTB = false;
-  TB::UseRule50 = Options["Syzygy50MoveRule"];
-  TB::ProbeDepth = Options["SyzygyProbeDepth"] * ONE_PLY;
-  TB::Cardinality = Options["SyzygyProbeLimit"];
-
-  // Skip TB probing when no TB found: !TBLargest -> !TB::Cardinality
-  if (TB::Cardinality > TB::MaxCardinality)
-  {
-      TB::Cardinality = TB::MaxCardinality;
-      TB::ProbeDepth = DEPTH_ZERO;
-  }
-
-  if (rootMoves.empty())
-  {
-      rootMoves.push_back(RootMove(MOVE_NONE));
-      sync_cout << "info depth 0 score "
-                << UCI::value(rootPos.checkers() ? -VALUE_MATE : VALUE_DRAW)
-                << sync_endl;
-  }
-  else
-  {
-      if (TB::Cardinality >=  rootPos.count<ALL_PIECES>(WHITE)
-                            + rootPos.count<ALL_PIECES>(BLACK))
-      {
-          // If the current root position is in the tablebases then RootMoves
-          // contains only moves that preserve the draw or win.
-          TB::RootInTB = Tablebases::root_probe(rootPos, rootMoves, TB::Score);
-
-          if (TB::RootInTB)
-              TB::Cardinality = 0; // Do not probe tablebases during the search
-
-          else // If DTZ tables are missing, use WDL tables as a fallback
-              {
-                  // Filter out moves that do not preserve a draw or win
-                  TB::RootInTB = Tablebases::root_probe_wdl(rootPos, rootMoves, TB::Score);
-
-              // Only probe during search if winning
-              if (TB::Score <= VALUE_DRAW)
-                  TB::Cardinality = 0;
-          }
-
-          if (TB::RootInTB)
-          {
-              TB::Hits = rootMoves.size();
-
-              if (!TB::UseRule50)
-                  TB::Score =  TB::Score > VALUE_DRAW ?  VALUE_MATE - MAX_PLY - 1
-                             : TB::Score < VALUE_DRAW ? -VALUE_MATE + MAX_PLY + 1
-                                                      :  VALUE_DRAW;
-          }
-      }
-
-      for (Thread* th : Threads)
-      {
-          th->maxPly = 0;
-          th->rootDepth = DEPTH_ZERO;
-          if (th != this)
-          {
-              th->rootPos = Position(rootPos, th);
-              th->rootMoves = rootMoves;
-              th->start_searching();
-          }
-      }
-
-      Thread::search(); // Let's start searching!
-  }
-
-  // When playing in 'nodes as time' mode, subtract the searched nodes from
-  // the available ones before to exit.
-  if (Limits.npmsec)
-      Time.availableNodes += Limits.inc[us] - Threads.nodes_searched();
-
-  // When we reach the maximum depth, we can arrive here without a raise of
-  // Signals.stop. However, if we are pondering or in an infinite search,
-  // the UCI protocol states that we shouldn't print the best move before the
-  // GUI sends a "stop" or "ponderhit" command. We therefore simply wait here
-  // until the GUI sends one of those commands (which also raises Signals.stop).
-  if (!Signals.stop && (Limits.ponder || Limits.infinite))
-  {
-      Signals.stopOnPonderhit = true;
-      wait(Signals.stop);
-  }
-
-  // Stop the threads if not already stopped
-  Signals.stop = true;
-
-  // Wait until all threads have finished
-  for (Thread* th : Threads)
-      if (th != this)
-          th->wait_for_search_finished();
-
-  // Check if there are threads with a better score than main thread
-  Thread* bestThread = this;
-  if (   !this->easyMovePlayed
-      &&  Options["MultiPV"] == 1
-      && !Skill(Options["Skill Level"]).enabled())
-  {
-      for (Thread* th : Threads)
-          if (   th->completedDepth > bestThread->completedDepth
-              && th->rootMoves[0].score > bestThread->rootMoves[0].score)
-              bestThread = th;
-  }
-
-  // Send new PV when needed
-  if (bestThread != this)
-      sync_cout << UCI::pv(bestThread->rootPos, bestThread->completedDepth, -VALUE_INFINITE, VALUE_INFINITE) << sync_endl;
-
-  sync_cout << "bestmove " << UCI::move(bestThread->rootMoves[0].pv[0], rootPos.is_chess960());
-
-  if (bestThread->rootMoves[0].pv.size() > 1 || bestThread->rootMoves[0].extract_ponder_from_tt(rootPos))
-      std::cout << " ponder " << UCI::move(bestThread->rootMoves[0].pv[1], rootPos.is_chess960());
-
-  std::cout << sync_endl;
+    mcts_main_search();
 }
 
 
@@ -887,7 +991,7 @@ moves_loop: // When in check search starts from here
       if (RootNode && thisThread == Threads.main() && Time.elapsed() > 3000)
             sync_cout << "info depth " << depth / ONE_PLY
             << " currmove " << UCI::move(move, pos.is_chess960())
-            << " currmovenumber " << moveCount + thisThread->PVIdx << sync_endl;887
+            << " currmovenumber " << moveCount + thisThread->PVIdx << sync_endl;
 
         if (PvNode)
             (ss+1)->pv = nullptr;

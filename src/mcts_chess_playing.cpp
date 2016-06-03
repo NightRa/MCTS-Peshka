@@ -43,3 +43,8 @@ void fillVectorWithMoves(Position& pos, std::vector<ExtMove>& moveVector, ExtMov
         startingPointer++;
     }
 }
+
+int getNumMoves(Position& pos, ExtMove* buffer) {
+    ExtMove* end = generate<LEGAL>(pos, buffer);
+    return int(end - buffer);
+}

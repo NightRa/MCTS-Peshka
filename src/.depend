@@ -28,7 +28,8 @@ position.o: position.cpp bitcount.h types.h misc.h movegen.h position.h \
 psqt.o: psqt.cpp types.h
 search.o: search.cpp evaluate.h types.h misc.h movegen.h movepick.h \
  position.h bitboard.h search.h timeman.h thread.h material.h endgame.h \
- pawns.h thread_win32.h tt.h uci.h syzygy/tbprobe.h syzygy/../search.h
+ pawns.h thread_win32.h tt.h uci.h syzygy/tbprobe.h syzygy/../search.h \
+ mcts.h mcts_chess_playing.h mcts_prior.h mcts_pv.h
 thread.o: thread.cpp movegen.h types.h search.h misc.h position.h \
  bitboard.h thread.h material.h endgame.h movepick.h pawns.h \
  thread_win32.h uci.h
@@ -46,3 +47,21 @@ tbprobe.o: syzygy/tbprobe.cpp syzygy/../position.h syzygy/../bitboard.h \
  syzygy/../types.h syzygy/../movegen.h syzygy/../bitboard.h \
  syzygy/../search.h syzygy/../misc.h syzygy/../position.h \
  syzygy/../bitcount.h syzygy/tbprobe.h syzygy/tbcore.h syzygy/tbcore.cpp
+mcts.o: mcts.cpp syzygy/tbprobe.h syzygy/../search.h syzygy/../misc.h \
+ syzygy/../types.h syzygy/../position.h syzygy/../bitboard.h mcts.h \
+ types.h position.h movepick.h movegen.h search.h mcts_chess_playing.h \
+ mcts_prior.h uci.h evaluate.h mcts_tablebase.h timeman.h misc.h thread.h \
+ material.h endgame.h pawns.h thread_win32.h mcts_pv.h
+mcts_chess_playing.o: mcts_chess_playing.cpp mcts_chess_playing.h \
+ position.h bitboard.h types.h movegen.h mcts_tablebase.h
+mcts_prior.o: mcts_prior.cpp mcts_prior.h movegen.h types.h evaluate.h \
+ position.h bitboard.h
+mcts_pv.o: mcts_pv.cpp syzygy/tbprobe.h syzygy/../search.h \
+ syzygy/../misc.h syzygy/../types.h syzygy/../position.h \
+ syzygy/../bitboard.h mcts_pv.h types.h mcts.h position.h movepick.h \
+ movegen.h search.h mcts_chess_playing.h mcts_prior.h timeman.h misc.h \
+ thread.h material.h endgame.h pawns.h thread_win32.h uci.h
+mcts_tablebase.o: mcts_tablebase.cpp syzygy/tbprobe.h syzygy/../search.h \
+ syzygy/../misc.h syzygy/../types.h syzygy/../position.h \
+ syzygy/../bitboard.h mcts_tablebase.h position.h mcts_chess_playing.h \
+ movegen.h types.h uci.h

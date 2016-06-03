@@ -1,16 +1,8 @@
 #include <sstream>
+#include "syzygy/tbprobe.h"
 #include "mcts_pv.h"
 #include "timeman.h"
 #include "uci.h"
-
-namespace Tablebases {
-    int Cardinality;
-    uint64_t Hits;
-    bool RootInTB;
-    bool UseRule50;
-    Depth ProbeDepth;
-    Value Score;
-}
 
 namespace TB = Tablebases;
 
@@ -55,8 +47,7 @@ MCTS_PV mctsPv(MCTS_Node& node) {
     if (!node.fully_opened() /*leaf*/ || node.totalVisits < Search::pvThreshold) {
         return MCTS_PV(std::vector<Move>(0), 0 /*changed in rec*/, Time.elapsed() + 1, 0, Threads.nodes_searched());
     }
-    auto best = std::max_element(node.edges.begin(), node.edges.end(), [](MCTS_Edge edge){ return edge.numRollouts; });
-    MCTS_Edge& bestEdge = *best;
+    MCTS_Edge& bestEdge = *node.selectBest();
     MCTS_PV childPv = mctsPv(bestEdge.node);
     childPv.depth++;
     childPv.moves.push_back(bestEdge.move);

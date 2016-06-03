@@ -37,7 +37,8 @@ PGOBENCH = ./$(EXE) bench 16 1 1000 default time
 ### Object files
 OBJS = benchmark.o bitbase.o bitboard.o endgame.o evaluate.o main.o \
 	material.o misc.o movegen.o movepick.o pawns.o position.o psqt.o \
-	search.o thread.o timeman.o tt.o uci.o ucioption.o syzygy/tbprobe.o
+	search.o thread.o timeman.o tt.o uci.o ucioption.o syzygy/tbprobe.o \
+	mcts.o mcts_chess_playing.o mcts_prior.o mcts_pv.o mcts_tablebase.o
 
 ### ==========================================================================
 ### Section 2. High-level Configuration
