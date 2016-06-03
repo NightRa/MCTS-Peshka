@@ -439,7 +439,7 @@ void MainThread::mcts_main_search() {
     sync_cout << mcts_pv_print(mcts_root) << sync_endl;
 
 
-    if(mcts_root.initialized) {
+    if(mcts_root.initialized && !mcts_root.edges.empty()) {
         MCTS_Edge& bestEdge = *mcts_root.selectBest();
 
         sync_cout << "bestmove " << UCI::move(bestEdge.move, rootPos.is_chess960());

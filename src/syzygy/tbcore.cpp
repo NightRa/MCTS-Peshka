@@ -18,6 +18,7 @@
 #include <sys/mman.h>
 #endif
 #include "tbcore.h"
+#include "tbprobe.h"
 
 #define TBMAX_PIECE 254
 #define TBMAX_PAWN 256

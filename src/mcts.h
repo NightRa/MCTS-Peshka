@@ -88,6 +88,10 @@ public:
         return initialized && unopened_moves.empty() && edges.empty();
     }
 
+    bool isLeaf() {
+        return !initialized || !unopened_moves.empty();
+    }
+
     void update_child_stats(MCTS_Edge* childEdge);
 
     int getNumMoves(Position& pos, ExtMove* buffer) {

@@ -14,6 +14,7 @@ namespace Search {
     double eval(Position& pos);
 
     void mctsSearch(Position& pos, MCTS_Node& root) {
+        const int printEvery = 1;
         // Updated by check_time()
         initTableBase();
 
@@ -23,8 +24,7 @@ namespace Search {
 
         int iteration = 0;
         while (!Signals.stop) {
-            iteration++;
-
+            std::cout << "all ok.."  << iteration << std::endl;
             MCTS_Node* node = &root;
             StateInfo* currentSt = sts;
 
@@ -33,7 +33,7 @@ namespace Search {
 
             PlayingResult gameResult = getGameResult(pos, node->getNumMoves(pos, moveBuffer));
 
-            while (gameResult == ContinueGame && !node->fully_opened()) {
+            while (gameResult == ContinueGame && !node->isLeaf()) {
                 MCTS_Edge* child = select_child_UCT(node);
                 do_move_mcts(pos, node, currentSt, child);
 
@@ -82,13 +82,15 @@ namespace Search {
             }
 
             // optionally print move
-            if (iteration % 100 == 0) {
+            if (iteration % printEvery == 0) {
                 mcts_check_time();
             }
-            if (Time.elapsed() > 1000 && iteration % 100 == 0) {
-                sync_cout << mcts_pv_print(root) << sync_endl;
+            if (Time.elapsed() > 1000 && iteration % printEvery == 0) {
+                std::cout << mcts_pv_print(root) << std::endl;
+                // sync_cout << mcts_pv_print(root) << sync_endl;
             }
             // check-out search.cpp line 887
+            iteration++;
         }
     }
 
