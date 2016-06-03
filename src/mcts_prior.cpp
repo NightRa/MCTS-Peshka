@@ -6,8 +6,6 @@
 #include "position.h"
 #include "mcts_chess_playing.h"
 
-Value qeval(Position& pos);
-
 Value safeEval(Position& pos, Move move /*player*/, CheckInfo& ci /*already computed for pos*/, StateInfo& st) {
     bool isCheck = pos.gives_check(move, ci); // moving player gave check.
     if (isCheck) {
@@ -24,6 +22,11 @@ Value safeEval(Position& pos, Move move /*player*/, CheckInfo& ci /*already comp
 }
 
 Value qeval(Position& pos) {
+/*
+    if (!pos.checkers()) {
+        return Eval::evaluate(pos);
+    }
+
     ExtMove evasionsBuffer[16];
     
     StateInfo st;
@@ -59,6 +62,8 @@ Value qeval(Position& pos) {
     }
 
     return bestValue;
+*/
+    return Value(1);
 }
 
 

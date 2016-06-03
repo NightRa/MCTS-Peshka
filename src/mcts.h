@@ -39,9 +39,10 @@ struct UnopenedMoves {
     }
 
     void remove(UnopenedMove move) {
-        const std::vector<UnopenedMove>::iterator& iterator = std::find(unopened_moves.begin(), unopened_moves.end(), move);
+        const std::vector<UnopenedMove>::iterator& iterator = std::find(unopened_moves.begin(), unopened_moves.end(),
+                                                                        move);
         auto it = iterator;
-        if(it != unopened_moves.end())
+        if (it != unopened_moves.end())
             unopened_moves.erase(it);
 
         sumUnopenedPriorExps -= move.expPrior;
@@ -123,7 +124,7 @@ struct MCTS_Edge {
     float overallEval;
     MCTS_Node* parent;
 
-    int score () {
+    int score() {
         return (int) ((overallEval * 30) * int(PawnValueEg));
     }
 
@@ -140,6 +141,30 @@ struct MCTS_Edge {
     }
 
     MCTS_Edge() {}
+
+    MCTS_Edge(const MCTS_Edge& other) {
+        transfer(other);
+    }
+
+    MCTS_Edge& operator=(const MCTS_Edge& other) {
+        transfer(other);
+        return *this;
+    }
+
+private:
+    void transfer(const MCTS_Edge& other) {
+        node = other.node;
+        node.incoming_edge = this; // This is the important bit!
+        move = other.move;
+        prior = other.prior;
+        evalSum = other.evalSum;
+        numEvals = other.numEvals;
+        rolloutsSum = other.rolloutsSum;
+        numRollouts = other.numRollouts;
+        overallEval = other.overallEval;
+        parent = other.parent;
+    }
+
 
 private:
     float compute_overall_eval(float evalWeight) {

@@ -2,6 +2,7 @@
 #define SRC_MCTS_PRIOR_H
 
 #include "movegen.h"
+#include "position.h"
 
 struct UnopenedMove {
     Move move;
@@ -21,5 +22,7 @@ void calc_exp_evals(Position& pos, ExtMove* moves, int size);
 void calc_priors(Position& pos, ExtMove* moves, int size);
 Move sampleMove(Position& pos, ExtMove* moves);
 UnopenedMove sampleMove(Position& pos, std::vector<UnopenedMove>& moves);
+Value safeEval(Position& pos, Move move /*player*/, CheckInfo& ci /*already computed for pos*/, StateInfo& st);
+Value qeval(Position& pos);
 
 #endif //SRC_MCTS_PRIOR_H

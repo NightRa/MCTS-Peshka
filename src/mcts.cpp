@@ -64,8 +64,9 @@ namespace Search {
                     std::cout << "5" << std::endl;
                     rolloutResult = rollout(pos, currentSt, lastSt, moveBuffer);
                 }
-
+                std::cout << "6" << std::endl;
                 evalResult = eval(pos);
+                std::cout << "7" << std::endl;
             }
 
             // Back propagation
@@ -139,7 +140,9 @@ namespace Search {
 
     void do_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Edge* childEdge) {
         node = &childEdge->node;
+        std::cout << pos << std::endl;
         pos.do_move(childEdge->move, *currentSt, pos.gives_check(childEdge->move, CheckInfo(pos)));
+        std::cout << pos << std::endl;
         currentSt++;
     }
 
@@ -167,7 +170,7 @@ namespace Search {
 
     double eval(Position& pos) {
         // k = ln(p/(1-p))/delta x => delta x = 30, p = 0.9 => k = 0.073
-        Value v = Eval::evaluate(pos);
+        Value v = qeval(pos);
         if (abs(v) < VALUE_MATE - MAX_PLY) { // not in mate, scale to -0.9 0.9
             const double k = 0.073;
             double pawnValue = double(v) / PawnValueEg; // assume range of [-30,30]
