@@ -19,7 +19,7 @@ struct UnopenedMoves {
 
     inline void initialize(Position& pos, ExtMove* buffer) {
         ExtMove* end = generate<LEGAL>(pos, buffer);
-        int numMoves = int(end - buffer);
+        int numMoves = countValidMoves(buffer, int(end - buffer));
         // Calculate e^(x/t - max) for all elements in the buffer.
         calc_exp_evals(pos, buffer, numMoves);
         // And write the ExtMoves with the correct Priors to the moves vector.

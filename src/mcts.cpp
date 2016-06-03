@@ -31,8 +31,9 @@ namespace Search {
             int rolloutResult;
             double evalResult;
 
-            PlayingResult gameResult = getGameResult(pos, node->getNumMoves(pos, moveBuffer));
-
+            int numMoves = node->getNumMoves(pos, moveBuffer);
+            PlayingResult gameResult = getGameResult(pos, numMoves);
+            std::cout << "1" << std::endl;
             while (gameResult == ContinueGame && !node->isLeaf()) {
                 MCTS_Edge* child = select_child_UCT(node);
                 do_move_mcts(pos, node, currentSt, child);
@@ -45,7 +46,7 @@ namespace Search {
                     gameResult = getGameResult(pos, node->getNumMoves(pos, moveBuffer));
                 }
             }
-
+            std::cout << "2" << std::endl;
             if (gameResult != ContinueGame) {
 
                 rolloutResult = gameResult;
@@ -54,12 +55,13 @@ namespace Search {
             } else { // at leaf = not fully opened.
 
                 MCTS_Edge* childEdge = node->open_child(pos, moveBuffer);
-
+                std::cout << "3" << std::endl;
                 do_move_mcts(pos, node, currentSt, childEdge);
-
+                std::cout << "4" << std::endl;
                 if (currentSt == lastSt) {
                     rolloutResult = Tie;
                 } else {
+                    std::cout << "5" << std::endl;
                     rolloutResult = rollout(pos, currentSt, lastSt, moveBuffer);
                 }
 
@@ -104,10 +106,17 @@ namespace Search {
             ExtMove* startingMove = moveBuffer;
 
             ExtMove* endingMove = generate<LEGAL>(pos, startingMove);
-            int movesSize = int(endingMove - startingMove);
+            int movesSize = countValidMoves(startingMove, int(endingMove - startingMove));
+
+            std::cout << "Position:" << pos << std::endl;
             calc_priors(pos, startingMove, movesSize);
+            std::cout << "After calc_priors, before sampleMove:" << pos << std::endl;
 
             Move chosenMove = sampleMove(pos, startingMove);
+            std::cout << "Chosen move:" << chosenMove << std::endl;
+            if (chosenMove == 1048) {
+                std::cout << "yo" << std::endl;
+            }
             pos.do_move(chosenMove, *currentStateInfo, pos.gives_check(chosenMove, CheckInfo(pos)));
             movesDone[filled] = chosenMove;
             filled++;

@@ -4,28 +4,84 @@
 #include "mcts_prior.h"
 #include "evaluate.h"
 #include "position.h"
+#include "mcts_chess_playing.h"
+
+Value qeval(Position& pos);
+
+Value safeEval(Position& pos, Move move /*player*/, CheckInfo& ci /*already computed for pos*/, StateInfo& st) {
+    bool isCheck = pos.gives_check(move, ci); // moving player gave check.
+    if (isCheck) {
+        pos.do_move(move, st, isCheck);
+        Value deepEval = qeval(pos);
+        pos.undo_move(move);
+        return -deepEval;
+    } else {
+        pos.do_move(move, st, isCheck);
+        Value eval = Eval::evaluate<false>(pos);
+        pos.undo_move(move);
+        return eval;
+    }
+}
+
+Value qeval(Position& pos) {
+    ExtMove evasionsBuffer[16];
+    
+    StateInfo st;
+    CheckInfo ci(pos);
+
+    ExtMove* evasions = evasionsBuffer;
+    ExtMove* end = generate<LEGAL>(pos, evasions);
+
+    if (evasions == end) {
+        // Mate, we don't have moves, we lost.
+        return -VALUE_MATE;
+    }
+
+    Value bestValue = -VALUE_INFINITE;
+    while (evasions != end && *evasions != MOVE_NONE) {
+        // rec on the move, max.
+        Value currentValue;
+
+        bool isCheck = pos.gives_check(*evasions, ci);
+        pos.do_move(*evasions, st, isCheck);
+        if (!isCheck) {
+             currentValue = Eval::evaluate<false>(pos);
+        } else {
+            currentValue = -qeval(pos);
+        }
+        pos.undo_move(*evasions);
+
+        if (currentValue > bestValue) {
+            bestValue = currentValue;
+        }
+
+        evasions++;
+    }
+
+    return bestValue;
+}
+
 
 // e^(x/t - max)
 void calc_exp_evals(Position& pos, ExtMove* moves, int size) {
     const float normalizationFactor = 200; // Something like a pawn
 
     StateInfo st;
-    const CheckInfo ci(pos);
+    CheckInfo ci(pos);
 
-    for (int i = 0; i < size; i++) {
+    int count = 0;
+    for (int i = 0; i < size && moves[i] != MOVE_NONE; i++, count++) {
         // calculate move values (heuristics)
-        pos.do_move(moves[i].move, st, pos.gives_check(moves[i], ci));
-        float eval = float(Eval::evaluate<false>(pos)) / normalizationFactor;
-        moves[i].setPrior(eval);
-        pos.undo_move(moves[i]);
+        Value eval = safeEval(pos, moves[i], ci, st);
+        moves[i].setPrior(float(eval) / normalizationFactor);
     }
 
     float max = -VALUE_INFINITE;
-    for (int i = 0; i < size; i++) {
+    for (int i = 0; i < count; i++) {
         max = std::max(max, moves[i].getPrior());
     }
 
-    for (int i = 0; i < size; i++) {
+    for (int i = 0; i < count; i++) {
         float eval = std::exp(moves[i].getPrior() - max);
         moves[i].setPrior(eval);
     }

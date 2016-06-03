@@ -23,6 +23,7 @@
 #include <cstring>   // For std::memset, std::memcmp
 #include <iomanip>
 #include <sstream>
+#include <iostream>
 
 #include "bitcount.h"
 #include "misc.h"
@@ -609,6 +610,9 @@ bool Position::pseudo_legal(const Move m) const {
 /// Position::gives_check() tests whether a pseudo-legal move gives a check
 
 bool Position::gives_check(Move m, const CheckInfo& ci) const {
+
+  if(!is_ok(m))
+      std::cout << "problem" << std::endl;
 
   assert(is_ok(m));
   assert(ci.dcCandidates == discovered_check_candidates());

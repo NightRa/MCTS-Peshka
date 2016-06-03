@@ -34,17 +34,15 @@ PlayingResult getGameResult(Position& pos, int numMoves) {
     return ContinueGame;
 }
 
-// MoveBuffer is a 128 cells of ExtMoves that should be empty.
-void fillVectorWithMoves(Position& pos, std::vector<ExtMove>& moveVector, ExtMove* moveBuffer) {
-    ExtMove* startingPointer = moveBuffer;
-    ExtMove* endingPointer = generate<LEGAL>(pos, moveBuffer);
-    while (startingPointer != endingPointer) {
-        moveVector.push_back(*startingPointer);
-        startingPointer++;
-    }
-}
-
 int getNumMoves(Position& pos, ExtMove* buffer) {
     ExtMove* end = generate<LEGAL>(pos, buffer);
-    return int(end - buffer);
+    return countValidMoves(buffer, int(end - buffer));
+}
+
+int countValidMoves(ExtMove* moves, int maxSize) {
+    int i = 0;
+    while (i < maxSize && moves[i] != MOVE_NONE) {
+        i++;
+    }
+    return i;
 }
