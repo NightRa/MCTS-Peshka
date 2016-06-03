@@ -12,17 +12,17 @@ public:
     int depth;
     int time;
     int score;
-    uint64_t nodesVisited;
+    int64_t nodesVisited;
 
 
-    MCTS_PV(const std::vector<Move>& moves, int depth, int time, int score, uint64_t nodesVisited) : moves(moves),
-                                                                                                depth(depth),
-                                                                                                time(time),
-                                                                                                score(score),
-                                                                                                nodesVisited(
-                                                                                                        nodesVisited) { }
+    MCTS_PV(const std::vector<Move>& moves, int depth, int time, int score, int64_t nodesVisited) :
+            moves(moves),
+            depth(depth),
+            time(time),
+            score(score),
+            nodesVisited(nodesVisited) {}
 
-    std::string asString(){
+    std::string asString() {
         //TODO: Implement
     }
 };

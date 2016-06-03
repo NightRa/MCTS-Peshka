@@ -1,7 +1,7 @@
 #include <cmath>
 #include <algorithm>
 #include <syzygy/tbprobe.h>
-#include <c++/4.8.3/iostream>
+#include <iostream>
 #include "mcts.h"
 #include "uci.h"
 #include "evaluate.h"
@@ -90,7 +90,7 @@ namespace Search {
             if (Time.elapsed() > 1000 && iteration % 100 == 0) {
                //
                // Move bestMove = best.base()->move;
-                MCTS_PV pv = getPv(root);
+                MCTS_PV pv = mctsPv(root);
                 sync_cout << pv.asString() << sync_endl;
             }
             // check-out search.cpp line 887
@@ -98,10 +98,10 @@ namespace Search {
     }
 
     MCTS_PV mctsPv(MCTS_Node& node) {
-        if (!node.fully_opened() || node.totalVisits < pvThreshold) {
+        if (!node.fully_opened() /*leaf*/ || node.totalVisits < pvThreshold) {
            // std::vector<Move> vec(2);
             //vec.push_back(node.incoming_edge->move);
-            return MCTS_PV(std::vector<Move>(0), 0, Time.elapsed() + 1, 0, Threads.nodes_searched());
+            return MCTS_PV(std::vector<Move>(0), 0 /*changed in rec*/, Time.elapsed() + 1, 0, Threads.nodes_searched());
         }
         auto best = std::max_element(node.edges.begin(), node.edges.end(), [](MCTS_Edge edge){ return edge.numRollouts; });
         MCTS_Edge& bestEdge = *best;

@@ -24,6 +24,8 @@
 #include <cassert>
 #include <cstddef>  // For offsetof()
 #include <string>
+#include <random>
+#include <chrono>
 
 #include "bitboard.h"
 #include "types.h"
@@ -176,7 +178,7 @@ public:
   bool pos_is_ok(int* failedStep = nullptr) const;
   void flip();
 
-  std::mersenne_twister_engine getGenerator() { return generator; }
+  std::mt19937 getGenerator() { return generator; }
 
 private:
   // Initialization helpers (used while setting up a position)
@@ -193,7 +195,8 @@ private:
   void do_castling(Color us, Square from, Square& to, Square& rfrom, Square& rto);
   inline void setRandom(){
     long long int seed = std::chrono::system_clock::now().time_since_epoch().count();
-    this->generator = std::mersenne_twister_engine(seed);
+    // srand((unsigned int) seed);
+    this->generator = std::mt19937(seed);
   }
   // Data members
   Piece board[SQUARE_NB];
@@ -212,7 +215,7 @@ private:
   Thread* thisThread;
   StateInfo* st;
   bool chess960;
-  std::mersenne_twister_engine generator;
+  std::mt19937 generator;
 };
 
 extern std::ostream& operator<<(std::ostream& os, const Position& pos);

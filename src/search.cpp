@@ -43,7 +43,7 @@ namespace Search {
   StateStackPtr SetupStates;
 }
 
-/*namespace Tablebases {
+namespace Tablebases {
 
   int Cardinality;
   uint64_t Hits;
@@ -51,7 +51,7 @@ namespace Search {
   bool UseRule50;
   Depth ProbeDepth;
   Value Score;
-}*/
+}
 
 namespace TB = Tablebases;
 
@@ -1541,10 +1541,10 @@ string UCI::pv(const Position& pos, Depth depth, Value alpha, Value beta) {
           ss << "\n";
 
       ss << "info"
-         << " odepth \"    << d / ONE_PLY\n"
-                                                                                                                    "         << \" seldepth \" << pos.this_thread()->maxPly\n"
-                                                                                                                    "         << \" multipv \"  << i + 1\n"
-                                                                                                                    "         << \" scre "    << UCI::value(v);
+         << " depth "    << d / ONE_PLY
+         << " seldepth " << pos.this_thread()->maxPly
+         << " multipv "  << i + 1
+         << " score "    << UCI::value(v);
 
       if (!tb && i == PVIdx)
           ss << (v >= beta ? " lowerbound" : v <= alpha ? " upperbound" : "");

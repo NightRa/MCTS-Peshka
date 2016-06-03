@@ -46,7 +46,6 @@ set(SOURCE_FILES
     ucioption.cpp
     mcts.cpp
     mcts.h
-    mcts-src.h
     mcts_chess_playing.cpp
     mcts_chess_playing.h
     mcts_tablebase.cpp

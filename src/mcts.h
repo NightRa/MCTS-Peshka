@@ -35,6 +35,7 @@ struct MCTS_Edge {
 
     int score (){
         //TODO: Implement
+        return 0;
     }
 
     void update_stats(int rolloutResult, double evalResult, float evalWeight) {
