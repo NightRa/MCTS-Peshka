@@ -82,6 +82,9 @@ namespace Search {
             }
 
             // optionally print move
+            if (iteration % 100 == 0) {
+                mcts_check_time();
+            }
             if (Time.elapsed() > 1000 && iteration % 100 == 0) {
                 sync_cout << mcts_pv_print(root) << sync_endl;
             }

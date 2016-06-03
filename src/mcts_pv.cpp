@@ -65,4 +65,28 @@ MCTS_PV mctsPv(MCTS_Node& node) {
     return childPv;
 }
 
+// check_time() is used to print debug info and, more importantly, to detect
+// when we are out of available time and thus stop the search.
 
+void mcts_check_time() {
+
+    static TimePoint lastInfoTime = now();
+
+    int elapsed = Time.elapsed();
+    TimePoint tick = Search::Limits.startTime + elapsed;
+
+    if (tick - lastInfoTime >= 1000)
+    {
+        lastInfoTime = tick;
+        dbg_print();
+    }
+
+    // An engine may not stop pondering until told so by the GUI
+    if (Search::Limits.ponder)
+        return;
+
+    if (   (Search::Limits.use_time_management() && elapsed > Time.maximum() - 10)
+           || (Search::Limits.movetime && elapsed >= Search::Limits.movetime)
+           || (Search::Limits.nodes && Threads.nodes_searched() >= Search::Limits.nodes))
+        Search::Signals.stop = true;
+}
