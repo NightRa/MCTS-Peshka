@@ -111,6 +111,16 @@ public:
     MCTS_Edge* selectBest();
 
     MCTS_Edge* open_child(Position& pos, ExtMove* moveBuffer);
+
+private:
+    void transfer(const MCTS_Node& node) {
+        initialized = node.initialized;
+        edges = node.edges;
+        unopened_moves = node.unopened_moves;
+        maxVisits = node.maxVisits;
+        totalVisits = node.totalVisits;
+        incoming_edge = node.incoming_edge;
+    }
 };
 
 struct MCTS_Edge {
