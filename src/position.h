@@ -88,10 +88,10 @@ class Position {
 public:
   static void init();
 
-  Position() { setRandom(); }; // To define the global object RootPos
+  Position() = default; // To define the global object RootPos
   Position(const Position&) = delete;
-  Position(const Position& pos, Thread* th) { *this = pos; thisThread = th; setRandom(); }
-  Position(const std::string& f, bool c960, Thread* th) { set(f, c960, th); setRandom(); }
+  Position(const Position& pos, Thread* th) { *this = pos; thisThread = th; }
+  Position(const std::string& f, bool c960, Thread* th) { set(f, c960, th); }
   Position& operator=(const Position&); // To assign RootPos from UCI
 
   // FEN string input/output
@@ -178,8 +178,6 @@ public:
   bool pos_is_ok(int* failedStep = nullptr) const;
   void flip();
 
-  std::mt19937 getGenerator() { return generator; }
-
 private:
   // Initialization helpers (used while setting up a position)
   void clear();
@@ -193,11 +191,7 @@ private:
   void move_piece(Color c, PieceType pt, Square from, Square to);
   template<bool Do>
   void do_castling(Color us, Square from, Square& to, Square& rfrom, Square& rto);
-  inline void setRandom(){
-    long long int seed = std::chrono::system_clock::now().time_since_epoch().count();
-    // srand((unsigned int) seed);
-    this->generator = std::mt19937(seed);
-  }
+
   // Data members
   Piece board[SQUARE_NB];
   Bitboard byTypeBB[PIECE_TYPE_NB];
@@ -215,7 +209,6 @@ private:
   Thread* thisThread;
   StateInfo* st;
   bool chess960;
-  std::mt19937 generator;
 };
 
 extern std::ostream& operator<<(std::ostream& os, const Position& pos);

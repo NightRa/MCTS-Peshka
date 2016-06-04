@@ -14,17 +14,18 @@ namespace Search {
     double eval(Position& pos);
 
     void mctsSearch(Position& pos, MCTS_Node& root) {
-        const int printEvery = 1;
+        const int printEvery = 100;
         // Updated by check_time()
         initTableBase();
 
         StateInfo sts[MAX_PLY];
         StateInfo* lastSt = sts + MAX_PLY;
         ExtMove moveBuffer[128];
+        MCTS_Node* moveHistoryBuffer[MAX_PLY];
+        MCTS_Node** moveHistory = moveHistoryBuffer;
 
         int iteration = 0;
         while (!Signals.stop) {
-            std::cout << "all ok.."  << iteration << std::endl;
             MCTS_Node* node = &root;
             StateInfo* currentSt = sts;
 
@@ -33,10 +34,9 @@ namespace Search {
 
             int numMoves = node->getNumMoves(pos, moveBuffer);
             PlayingResult gameResult = getGameResult(pos, numMoves);
-            std::cout << "1" << std::endl;
             while (gameResult == ContinueGame && !node->isLeaf()) {
                 MCTS_Edge* child = select_child_UCT(node);
-                do_move_mcts(pos, node, currentSt, child);
+                do_move_mcts(pos, node, currentSt, child, moveHistory);
 
                 // If we reach the maximum depth, assume repeat or whatever.
                 if (currentSt == lastSt) {
@@ -46,7 +46,7 @@ namespace Search {
                     gameResult = getGameResult(pos, node->getNumMoves(pos, moveBuffer));
                 }
             }
-            std::cout << "2" << std::endl;
+
             if (gameResult != ContinueGame) {
 
                 rolloutResult = gameResult;
@@ -55,18 +55,13 @@ namespace Search {
             } else { // at leaf = not fully opened.
 
                 MCTS_Edge* childEdge = node->open_child(pos, moveBuffer);
-                std::cout << "3" << std::endl;
-                do_move_mcts(pos, node, currentSt, childEdge);
-                std::cout << "4" << std::endl;
+                do_move_mcts(pos, node, currentSt, childEdge, moveHistory);
                 if (currentSt == lastSt) {
                     rolloutResult = Tie;
                 } else {
-                    std::cout << "5" << std::endl;
                     rolloutResult = rollout(pos, currentSt, lastSt, moveBuffer);
                 }
-                std::cout << "6" << std::endl;
                 evalResult = eval(pos);
-                std::cout << "7" << std::endl;
             }
 
             // Back propagation
@@ -75,7 +70,7 @@ namespace Search {
 
                 MCTS_Edge* childEdge = node->incoming_edge;
 
-                undo_move_mcts(pos, node, currentSt);
+                undo_move_mcts(pos, node, currentSt, moveHistory);
 
                 // Update max stats in the parent
                 node->update_child_stats(childEdge);
@@ -89,8 +84,7 @@ namespace Search {
                 mcts_check_time();
             }
             if (Time.elapsed() > 1000 && iteration % printEvery == 0) {
-                std::cout << mcts_pv_print(root) << std::endl;
-                // sync_cout << mcts_pv_print(root) << sync_endl;
+                sync_cout << mcts_pv_print(root) << sync_endl;
             }
             // check-out search.cpp line 887
             iteration++;
@@ -109,15 +103,9 @@ namespace Search {
             ExtMove* endingMove = generate<LEGAL>(pos, startingMove);
             int movesSize = countValidMoves(startingMove, int(endingMove - startingMove));
 
-            std::cout << "Position:" << pos << std::endl;
             calc_priors(pos, startingMove, movesSize);
-            std::cout << "After calc_priors, before sampleMove:" << pos << std::endl;
 
             Move chosenMove = sampleMove(pos, startingMove);
-            std::cout << "Chosen move:" << chosenMove << std::endl;
-            if (chosenMove == 1048) {
-                std::cout << "yo" << std::endl;
-            }
             pos.do_move(chosenMove, *currentStateInfo, pos.gives_check(chosenMove, CheckInfo(pos)));
             movesDone[filled] = chosenMove;
             filled++;
@@ -138,17 +126,22 @@ namespace Search {
         return result;
     }
 
-    void do_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Edge* childEdge) {
+    void do_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Edge* childEdge, MCTS_Node**& moveHistory) {
+        // Last element in the history is the parent
+        *moveHistory = node;
+        moveHistory++;
+
         node = &childEdge->node;
-        std::cout << pos << std::endl;
         pos.do_move(childEdge->move, *currentSt, pos.gives_check(childEdge->move, CheckInfo(pos)));
-        std::cout << pos << std::endl;
         currentSt++;
     }
 
-    void undo_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt) {
+    void undo_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Node**& moveHistory) {
         pos.undo_move(node->incoming_edge->move);
-        node = node->incoming_edge->parent;
+
+        moveHistory--;
+        node = *moveHistory; // Last element in the history is the parent
+
         currentSt--;
     }
 
@@ -156,12 +149,12 @@ namespace Search {
         // attest( ! children.empty() );
         double max_UCT_score = -VALUE_INFINITE;
         MCTS_Edge* bestEdge = nullptr;
-        for (MCTS_Edge& child: node->edges) {
-            double score = child.overallEval +
-                           cpuct * child.prior * std::sqrt(node->totalVisits) / (1 + child.numRollouts);
+        for (MCTS_Edge* child: node->edges) {
+            double score = child->overallEval +
+                           cpuct * child->prior * std::sqrt(node->totalVisits) / (1 + child->numRollouts);
             if (score > max_UCT_score) {
                 max_UCT_score = score;
-                bestEdge = &child;
+                bestEdge = child;
             }
         }
 
@@ -193,11 +186,12 @@ MCTS_Edge* MCTS_Node::open_child(Position& pos, ExtMove* moveBuffer) {
     initialize(pos, moveBuffer);
     // unopened_moves not empty.
     // sample move according to prior probabilities / take maximal probability
-    UnopenedMove move = sampleMove(pos, unopened_moves.unopened_moves);
+    UnopenedMove move = sampleMove(pos, unopened_moves.unopened_moves, unopened_moves.numMoves);
     // remove it from unopened_moves and insert to edges.
     unopened_moves.remove(move);
-    edges.push_back(MCTS_Edge(move.move, move.prior, this));
-    return &edges[edges.size() - 1];
+    MCTS_Edge* childEdge = new MCTS_Edge(move.move, move.absolutePrior); // Notice Allocation here!
+    edges.push_back(childEdge);
+    return edges[edges.size() - 1];
 }
 
 MCTS_Edge* MCTS_Node::selectBest() {
@@ -206,12 +200,18 @@ MCTS_Edge* MCTS_Node::selectBest() {
     } else {
         NumVisits max_visits = 0;
         MCTS_Edge* maxEdge = nullptr;
-        for (MCTS_Edge& edge: edges) {
-            if (edge.numRollouts > max_visits) {
-                max_visits = edge.numRollouts;
-                maxEdge = &edge;
+        for (MCTS_Edge* edge: edges) {
+            if (edge->numRollouts > max_visits) {
+                max_visits = edge->numRollouts;
+                maxEdge = edge;
             }
         }
         return maxEdge;
+    }
+}
+
+MCTS_Node::~MCTS_Node() {
+    for (MCTS_Edge* child: edges) {
+        delete child;
     }
 }

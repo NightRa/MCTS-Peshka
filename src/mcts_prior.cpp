@@ -1,6 +1,7 @@
 #include <cmath>
 #include <chrono>
 #include <random>
+#include <iostream>
 #include "mcts_prior.h"
 #include "evaluate.h"
 #include "position.h"
@@ -22,7 +23,6 @@ Value safeEval(Position& pos, Move move /*player*/, CheckInfo& ci /*already comp
 }
 
 Value qeval(Position& pos) {
-/*
     if (!pos.checkers()) {
         return Eval::evaluate(pos);
     }
@@ -62,8 +62,6 @@ Value qeval(Position& pos) {
     }
 
     return bestValue;
-*/
-    return Value(1);
 }
 
 
@@ -94,17 +92,26 @@ void calc_exp_evals(Position& pos, ExtMove* moves, int size) {
 }
 
 void calc_priors(Position& pos, ExtMove* moves, int size) {
-    // e^(x/t - max)
+    // e^(x/t - max) / sum
     calc_exp_evals(pos, moves, size);
 
     double expSum = 0;
     for (int i = 0; i < size; i++) {
         expSum += moves[i].getPrior();
     }
+
+    for (int i = 0; i < size; i++) {
+        moves[i].setPrior(float(moves[i].getPrior() / expSum));
+    }
+}
+
+std::ranlux24 getGenerator() {
+    long long int seed = std::chrono::system_clock::now().time_since_epoch().count();
+    return std::ranlux24(seed);
 }
 
 Move sampleMove(Position& pos, ExtMove* moves) {
-    auto generator = pos.getGenerator();
+    auto generator = getGenerator();
     std::uniform_real_distribution<float> distribution(0.0, 1.0);
 
     float stopPoint = distribution(generator);
@@ -119,15 +126,16 @@ Move sampleMove(Position& pos, ExtMove* moves) {
     return moves[i - 1];
 }
 
-UnopenedMove sampleMove(Position& pos, std::vector<UnopenedMove>& moves) {
-    auto generator = pos.getGenerator();
+UnopenedMove sampleMove(Position& pos, UnopenedMove* moves, int numMoves) {
+    // Assumes sum of relativePriors is 1.
+    auto generator = getGenerator();
     std::uniform_real_distribution<float> distribution(0.0, 1.0);
 
     float stopPoint = distribution(generator);
 
     float partialSum = 0;
     int i = 0;
-    while (partialSum <= stopPoint) {
+    while (i < numMoves && partialSum <= stopPoint) {
         partialSum += moves[i].relativePrior;
         i++;
     }

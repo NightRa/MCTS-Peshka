@@ -23,7 +23,7 @@ public:
             nodesVisited(_nodesVisited) {}
 };
 
-MCTS_PV mctsPv(MCTS_Node& node);
+MCTS_PV mctsPv(MCTS_Node* node);
 std::string mcts_pv_print(MCTS_Node& root);
 void mcts_check_time();
 

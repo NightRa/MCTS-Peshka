@@ -12,10 +12,11 @@ typedef int NumVisits;
 typedef double EvalType;    // first check whether things work and only then change it to float
 
 struct UnopenedMoves {
-    std::vector<UnopenedMove> unopened_moves;
+    UnopenedMove* unopened_moves;
+    int numMoves;
     double sumUnopenedPriorExps;
 
-    UnopenedMoves() : unopened_moves(0), sumUnopenedPriorExps(0) {}
+    UnopenedMoves() : unopened_moves(nullptr), numMoves(0), sumUnopenedPriorExps(0) {}
 
     inline void initialize(Position& pos, ExtMove* buffer) {
         ExtMove* end = generate<LEGAL>(pos, buffer);
@@ -23,27 +24,32 @@ struct UnopenedMoves {
         // Calculate e^(x/t - max) for all elements in the buffer.
         calc_exp_evals(pos, buffer, numMoves);
         // And write the ExtMoves with the correct Priors to the moves vector.
-        unopened_moves.resize(numMoves);
+        this->numMoves = numMoves;
+        unopened_moves = new UnopenedMove[numMoves];
 
         double expSum = 0.0;
         for (int i = 0; i < numMoves; i++) {
             expSum += buffer[i].getPrior();
         }
 
+        sumUnopenedPriorExps = expSum;
+
         for (int i = 0; i < numMoves; i++) {
             ExtMove& x = *buffer;
-            UnopenedMove move(x.move, x.getPrior(), float(x.getPrior() / expSum));
-            unopened_moves.push_back(move);
+            float expPrior = x.getPrior(); // e^x
+            UnopenedMove move(x.move, expPrior, float(expPrior / expSum));
+            unopened_moves[i] = move;
             buffer++;
         }
     }
 
     void remove(UnopenedMove move) {
-        const std::vector<UnopenedMove>::iterator& iterator = std::find(unopened_moves.begin(), unopened_moves.end(),
-                                                                        move);
-        auto it = iterator;
-        if (it != unopened_moves.end())
-            unopened_moves.erase(it);
+        UnopenedMove* it = std::find(unopened_moves, unopened_moves + numMoves, move);
+        while (it < unopened_moves + numMoves - 1) {
+            *it = *(it + 1);
+            it++;
+        }
+        numMoves--;
 
         sumUnopenedPriorExps -= move.expPrior;
         for (int i = 0; i < size(); i++) {
@@ -53,11 +59,11 @@ struct UnopenedMoves {
     }
 
     inline bool empty() {
-        return unopened_moves.empty();
+        return numMoves == 0;
     }
 
     inline int size() {
-        return int(unopened_moves.size());
+        return numMoves;
     }
 
 };
@@ -70,7 +76,7 @@ public:
     //         Not fully opened - Edges not empty & unopened moves not empty
     //         Fully opened - Edges not empty & unopened moves empty
     bool initialized;
-    std::vector<MCTS_Edge> edges;
+    std::vector<MCTS_Edge*> edges;
     UnopenedMoves unopened_moves;
     NumVisits maxVisits;
     NumVisits totalVisits;
@@ -112,6 +118,8 @@ public:
 
     MCTS_Edge* open_child(Position& pos, ExtMove* moveBuffer);
 
+    ~MCTS_Node();
+
 private:
     void transfer(const MCTS_Node& node) {
         initialized = node.initialized;
@@ -132,7 +140,6 @@ struct MCTS_Edge {
     NumVisits rolloutsSum;
     NumVisits numRollouts;
     float overallEval;
-    MCTS_Node* parent;
 
     int score() {
         return (int) ((overallEval * 30) * int(PawnValueEg));
@@ -146,7 +153,7 @@ struct MCTS_Edge {
         overallEval = compute_overall_eval(evalWeight);
     }
 
-    MCTS_Edge(Move _move, float _prior, MCTS_Node* _parent) : node(this), move(_move), prior(_prior), parent(_parent) {
+    MCTS_Edge(Move _move, float _prior) : node(this), move(_move), prior(_prior) {
         overallEval = _prior;
     }
 
@@ -172,7 +179,6 @@ private:
         rolloutsSum = other.rolloutsSum;
         numRollouts = other.numRollouts;
         overallEval = other.overallEval;
-        parent = other.parent;
     }
 
 
@@ -190,8 +196,8 @@ namespace Search {
 
     void mctsSearch(Position& pos, MCTS_Node& root);
     MCTS_Edge* select_child_UCT(MCTS_Node* node);
-    void do_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Edge* childEdge);
-    void undo_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt);
+    void do_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Edge* childEdge, MCTS_Node**& moveHistory);
+    void undo_move_mcts(Position& pos, MCTS_Node*& node, StateInfo*& currentSt, MCTS_Node**& moveHistory);
     PlayingResult rollout(Position& pos, StateInfo*& currentStateInfo, StateInfo* lastStateInfo, ExtMove* moveBuffer);
 }
 
