@@ -11,7 +11,8 @@ std::string mcts_pv_print(MCTS_Node& root) {
     int elapsed = Time.elapsed() + 1;
     int64_t nodes_searched = Threads.nodes_searched();
 
-    MCTS_PV pv = mctsPv(&root);
+    std::vector<Move> pvMoves = std::vector<Move>();
+    MCTS_PV pv = mctsPv(&root, pvMoves);
 
     if (pv.depth <= 1)
         return "";
@@ -43,17 +44,24 @@ std::string mcts_pv_print(MCTS_Node& root) {
     return ss.str();
 }
 
-MCTS_PV mctsPv(MCTS_Node* node) {
+MCTS_PV mctsPv(MCTS_Node* node, std::vector<Move>& pvBuffer) {
     if (node == nullptr || node->totalVisits < Search::pvThreshold || !node->fully_opened() /*leaf*/) {
         return MCTS_PV(std::vector<Move>(0), 0 /*changed in rec*/, Time.elapsed() + 1, 0, Threads.nodes_searched());
     }
     MCTS_Edge* bestEdge = node->selectBest();
-    MCTS_PV childPv = mctsPv(&bestEdge->node);
-    childPv.depth++;
-    childPv.moves.push_back(bestEdge->move);
-    if (node->incoming_edge == nullptr)
-        childPv.score = bestEdge->score();
-    return childPv;
+    if (bestEdge != nullptr) {
+        pvBuffer.push_back(bestEdge->move);
+        MCTS_PV childPv = mctsPv(&bestEdge->node, pvBuffer);
+        // childPv.moves.push_back(bestEdge->move);
+        childPv.moves = pvBuffer;
+        childPv.depth++;
+        if (node->incoming_edge == nullptr)
+            childPv.score = bestEdge->score();
+        return childPv;
+    } else {
+        return mctsPv(nullptr, pvBuffer);
+    }
+
 }
 
 // check_time() is used to print debug info and, more importantly, to detect

@@ -153,11 +153,10 @@ struct MCTS_Edge {
         overallEval = compute_overall_eval(evalWeight);
     }
 
-    MCTS_Edge(Move _move, float _prior) : node(this), move(_move), prior(_prior) {
-        overallEval = _prior;
-    }
+    MCTS_Edge(Move _move, float _prior) : node(this), move(_move), prior(_prior), overallEval(_prior), // very important
+                                            evalSum(0), numEvals(0), rolloutsSum(0), numRollouts(0){}
 
-    MCTS_Edge() {}
+    MCTS_Edge(): node(), move(), prior(0), evalSum(0), numEvals(0), rolloutsSum(0), numRollouts(0), overallEval(0) {}
 
     MCTS_Edge(const MCTS_Edge& other) {
         transfer(other);
@@ -190,9 +189,10 @@ private:
 };
 
 namespace Search {
-    const double cpuct = 1;
-    const float evalWeight = 0.2;
-    const int pvThreshold = 7;
+    extern const double cpuct;
+    extern const float evalWeight;
+    extern const int pvThreshold;
+    extern const float normalizationFactor;
 
     void mctsSearch(Position& pos, MCTS_Node& root);
     MCTS_Edge* select_child_UCT(MCTS_Node* node);

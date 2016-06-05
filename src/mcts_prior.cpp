@@ -6,6 +6,9 @@
 #include "evaluate.h"
 #include "position.h"
 #include "mcts_chess_playing.h"
+#include "mcts.h"
+
+std::ranlux24 getGenerator();
 
 Value safeEval(Position& pos, Move move /*player*/, CheckInfo& ci /*already computed for pos*/, StateInfo& st) {
     bool isCheck = pos.gives_check(move, ci); // moving player gave check.
@@ -67,8 +70,6 @@ Value qeval(Position& pos) {
 
 // e^(x/t - max)
 void calc_exp_evals(Position& pos, ExtMove* moves, int size) {
-    const float normalizationFactor = 200; // Something like a pawn
-
     StateInfo st;
     CheckInfo ci(pos);
 
@@ -76,7 +77,7 @@ void calc_exp_evals(Position& pos, ExtMove* moves, int size) {
     for (int i = 0; i < size && moves[i] != MOVE_NONE; i++, count++) {
         // calculate move values (heuristics)
         Value eval = safeEval(pos, moves[i], ci, st);
-        moves[i].setPrior(float(eval) / normalizationFactor);
+        moves[i].setPrior(float(eval) / Search::normalizationFactor);
     }
 
     float max = -VALUE_INFINITE;

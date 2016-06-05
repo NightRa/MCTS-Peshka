@@ -9,12 +9,20 @@
 #include "timeman.h"
 #include "mcts_pv.h"
 
+using std::sqrt;
+
 namespace Search {
+    const bool debug_UCT = false;
+    const double cpuct = 0.01;
+    const double explorationExponent = 0.5;
+    const float evalWeight = 0.0f;
+    const int pvThreshold = 7;
+    const float normalizationFactor = 200; // Something like a pawn
 
     double eval(Position& pos);
 
     void mctsSearch(Position& pos, MCTS_Node& root) {
-        const int printEvery = 100;
+        const int printEvery = 1000;
         // Updated by check_time()
         initTableBase();
 
@@ -85,6 +93,15 @@ namespace Search {
             }
             if (Time.elapsed() > 1000 && iteration % printEvery == 0) {
                 sync_cout << mcts_pv_print(root) << sync_endl;
+                if (debug_UCT) {
+                    for (MCTS_Edge* edge: root.edges) {
+                        sync_cout << UCI::move(edge->move, false) << ": " << edge->numRollouts << " = ";
+                        printf("%.2f", edge->overallEval);
+                        std::cout << ", ";
+                    }
+                    std::cout << sync_endl;
+                }
+
             }
             // check-out search.cpp line 887
             iteration++;
@@ -151,7 +168,7 @@ namespace Search {
         MCTS_Edge* bestEdge = nullptr;
         for (MCTS_Edge* child: node->edges) {
             double score = child->overallEval +
-                           cpuct * child->prior * std::sqrt(node->totalVisits) / (1 + child->numRollouts);
+                           cpuct * child->prior * std::pow(node->totalVisits, explorationExponent) / (1 + child->numRollouts);
             if (score > max_UCT_score) {
                 max_UCT_score = score;
                 bestEdge = child;
